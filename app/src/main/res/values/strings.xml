@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">Stock</string>
+    <string name="portfolio_active">持有中 (%1$d)</string>
+    <string name="portfolio_closed">已清倉 (%1$d)</string>
+    <string name="search_placeholder">搜尋股票代碼或名稱</string>
+    <string name="delete_confirm_title">刪除股票紀錄</string>
+    <string name="delete_confirm_msg">確定要刪除選中的 %1$d 支股票及其所有交易紀錄嗎？此動作無法復原。</string>
+    <string name="confirm_delete">確定刪除</string>
+    <string name="cancel">取消</string>
+    <string name="select_target_account">選擇目標帳戶</string>
+    <string name="move_confirm_title">確認移動股票</string>
+    <string name="move_confirm_msg">確定要將選中的 %1$d 支股票移動到「%2$s」嗎？</string>
+    <string name="confirm_move">確定移動</string>
+</resources>
