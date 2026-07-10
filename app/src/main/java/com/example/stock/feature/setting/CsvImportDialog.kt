@@ -53,7 +53,6 @@ fun CsvImportDialog(
         "total" to "總金額",
         "note" to "備註",
         "accountId" to "帳戶 ID",
-        "multiplier" to "乘數",
         "participatingShares" to "除權息股數"
     )
 

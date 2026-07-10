@@ -37,7 +37,9 @@ class SettingsViewModel @Inject constructor(
     private val repository: SettingsRepository,
     private val transactionRepository: TransactionRepository,
     private val googleDriveManager: GoogleDriveManager,
-    private val getStockInventoryUseCase: GetStockInventoryUseCase
+    private val getStockInventoryUseCase: GetStockInventoryUseCase,
+    private val importExcelUseCase: com.example.stock.core.domain.ImportExcelUseCase,
+    private val importCsvUseCase: com.example.stock.core.domain.ImportCsvUseCase
 ) : ViewModel() {
     private var saveJob: Job? = null
 
@@ -203,6 +205,50 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun importExcel(context: android.content.Context, uri: Uri, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val importedItems = importExcelUseCase.execute(context, uri)
+                if (importedItems.isNotEmpty()) {
+                    transactionRepository.upsertTransactions(importedItems)
+                    withContext(Dispatchers.Main) {
+                        onResult(true, "成功匯入 ${importedItems.size} 筆 Excel 資料")
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        onResult(false, "找不到有效的 Excel 資料內容")
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    onResult(false, "Excel 匯入出錯：${e.localizedMessage}")
+                }
+            }
+        }
+    }
+
+    fun importStandardCsv(context: android.content.Context, uri: Uri, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val importedItems = importCsvUseCase.execute(context, uri)
+                if (importedItems.isNotEmpty()) {
+                    transactionRepository.upsertTransactions(importedItems)
+                    withContext(Dispatchers.Main) {
+                        onResult(true, "成功匯入 ${importedItems.size} 筆 CSV 資料")
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        onResult(false, "找不到有效的 CSV 資料內容")
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    onResult(false, "CSV 匯入出錯：${e.localizedMessage}")
+                }
+            }
+        }
+    }
+
     // --- 新增：CSV 匯入暫存狀態 ---
     var csvHeader by mutableStateOf<List<String>?>(null)
     var pendingCsvUri by mutableStateOf<Uri?>(null)
@@ -281,13 +327,13 @@ class SettingsViewModel @Inject constructor(
                 )
 
                 // 3. 轉成 StockItem 格式 (只備份庫存不為 0 的)
-                val stockItems = result.inventoryMap.filter { it.value.shares > 0 }.map { (symbol, inventory) ->
-                    val name = allTransactions.find { it.symbol == symbol }?.name ?: symbol
+                val stockItems = result.positions.filter { it.value.shares > 0 }.map { (symbol, position) ->
+                    val name = position.name
                     StockItem(
                         symbol = symbol,
                         name = name,
-                        cost = inventory.totalCost,
-                        shares = inventory.shares
+                        cost = position.totalCost,
+                        shares = position.shares
                     )
                 }
 

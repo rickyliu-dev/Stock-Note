@@ -18,6 +18,7 @@ class CalculateTransactionUseCase @Inject constructor(
         val discount: Double,
         val minFee: Double,
         val customFee: Double? = null, // 使用者手動輸入的手續費
+        val customTax: Double? = null, // 使用者手動輸入的稅金
         val symbol: String = "" // 新增 symbol 用於判斷 ETF
     )
 
@@ -50,8 +51,10 @@ class CalculateTransactionUseCase @Inject constructor(
 
         // 2. 計算稅金 (僅賣出時產生)
         val tax = if (params.type == TransactionType.SELL) {
-            val isEtf = financialCalculator.isTaiwanEtf(params.symbol)
-            financialCalculator.calculateTax(subtotal, isEtf)
+            params.customTax ?: run {
+                val isEtf = financialCalculator.isTaiwanEtf(params.symbol)
+                financialCalculator.calculateTax(subtotal, isEtf)
+            }
         } else 0.0
 
         // 3. 計算總額

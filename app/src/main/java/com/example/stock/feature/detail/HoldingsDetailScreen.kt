@@ -54,8 +54,8 @@ import com.example.stock.feature.detail.component.TransactionItemCard
 @Composable
 fun HoldingsDetailScreen(
     onBack: () -> Unit,
-    onAddTransaction: (String) -> Unit,
-    onEditTransaction: (String, Long) -> Unit,
+    onAddTransaction: (String, String) -> Unit,
+    onEditTransaction: (String, String, Long) -> Unit,
     viewModel: DetailViewModel = hiltViewModel()
 ) {
     val symbol = viewModel.symbol
@@ -119,7 +119,7 @@ fun HoldingsDetailScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = { onAddTransaction(symbol) }) {
+                        IconButton(onClick = { onAddTransaction(symbol, name) }) {
                             Icon(Icons.Default.Add, contentDescription = "Add Transaction")
                         }
                     },
@@ -203,7 +203,7 @@ fun HoldingsDetailScreen(
                                 viewModel.toggleSelection(trans.id)
                             } else {
                                 // 一般模式
-                                onEditTransaction(trans.symbol, trans.id)
+                                onEditTransaction(trans.symbol, trans.name, trans.id)
                             }
                         },
                         onLongClick = {

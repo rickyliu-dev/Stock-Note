@@ -5,9 +5,9 @@ sealed class AllScreens(val route: String) {
     object Detail : AllScreens("detail/{symbol}") {
         fun createRoute(symbol: String) = "detail/$symbol"
     }
-    object AddTransaction : AllScreens("add_transaction/{symbol}/{id}") {
-        fun createRoute(symbol: String?, id: Long = -1L) =
-            "add_transaction/${symbol ?: "none"}/$id"
+    object AddTransaction : AllScreens("add_transaction/{symbol}/{id}/{name}") {
+        fun createRoute(symbol: String?, name: String? = null, id: Long = -1L) =
+            "add_transaction/${symbol ?: "none"}/$id/${name ?: "none"}"
     }
     object Settings : AllScreens("settings_main")
     object AccountManagement : AllScreens("account_management")
@@ -40,5 +40,6 @@ sealed class AllScreens(val route: String) {
     companion object {
         const val ARG_SYMBOL = "symbol"
         const val TRANSACTIONS_ID = "id"
+        const val ARG_NAME = "name"
     }
 }

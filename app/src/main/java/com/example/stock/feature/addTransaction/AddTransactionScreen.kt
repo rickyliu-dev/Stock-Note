@@ -361,10 +361,10 @@ fun AddTransactionScreen(
                                 Text(
                                     when {
                                         state.priceError -> "請輸入價格"
-                                        state.type == TransactionType.DIVIDEND -> "單股股息 (選填)"
-                                        state.type == TransactionType.STOCK_DIVIDEND -> "單股股利 (選填) "
-                                        state.type == TransactionType.SPLIT -> "新股比例 (例如 1.5)"
-                                        state.type == TransactionType.CAPITAL_REDUCTION -> "退還股款 (單股)"
+                                        state.type == TransactionType.DIVIDEND -> "單股股息 (元)"
+                                        state.type == TransactionType.STOCK_DIVIDEND -> "單股股利 (元)"
+                                        state.type == TransactionType.SPLIT -> "分割比例 (如 2.0)"
+                                        state.type == TransactionType.CAPITAL_REDUCTION -> "每股退還股款"
                                         else -> "成交單價"
                                     }
                                 )
@@ -402,11 +402,45 @@ fun AddTransactionScreen(
                     }
                 }
 
+                // 手續費與證交稅 (賣出時)
+                if (state.type == TransactionType.SELL) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedTextField(
+                            value = state.feeStr,
+                            onValueChange = { viewModel.onFeeChanged(it) },
+                            label = { Text(if (state.feeError) "請輸入金額" else "手續費") },
+                            isError = state.feeError,
+                            modifier = Modifier.weight(1f)
+                                .clearErrorOnFocus(state.feeError) { viewModel.clearFeeError() },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+                            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Next) })
+                        )
+                        OutlinedTextField(
+                            value = state.taxStr,
+                            onValueChange = { viewModel.onTaxChanged(it) },
+                            label = { Text(if (state.taxError) "請輸入金額" else "證交稅") },
+                            isError = state.taxError,
+                            modifier = Modifier.weight(1f)
+                                .clearErrorOnFocus(state.taxError) { viewModel.clearTaxError() },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+                            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Next) })
+                        )
+                    }
+                }
+
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    if (state.type != TransactionType.DEPOSIT && state.type != TransactionType.WITHDRAW) {
+                    // 如果不是賣出且有手續費需求，才在這裡顯示手續費 (例如買入、股息)
+                    if (state.type != TransactionType.SELL &&
+                        state.type != TransactionType.DEPOSIT &&
+                        state.type != TransactionType.WITHDRAW) {
                         OutlinedTextField(
                             value = state.feeStr,
                             onValueChange = { viewModel.onFeeChanged(it) },
@@ -435,9 +469,9 @@ fun AddTransactionScreen(
                         label = {
                             Text(
                                 when {
-                                    state.totalError -> if (state.type == TransactionType.STOCK_DIVIDEND || state.type == TransactionType.SPLIT) "請輸入總股數" else "請輸入總金額"
+                                    state.totalError -> if (state.type == TransactionType.STOCK_DIVIDEND || state.type == TransactionType.SPLIT || state.type == TransactionType.CAPITAL_REDUCTION) "請輸入股數" else "請輸入總金額"
                                     state.type == TransactionType.DIVIDEND -> "股息總額"
-                                    state.type == TransactionType.STOCK_DIVIDEND -> "總股數"
+                                    state.type == TransactionType.STOCK_DIVIDEND -> "配股總數"
                                     state.type == TransactionType.SPLIT -> "分割後總股數"
                                     state.type == TransactionType.CAPITAL_REDUCTION -> "減資後總股數"
                                     state.type == TransactionType.DEPOSIT || state.type == TransactionType.WITHDRAW -> "金額"

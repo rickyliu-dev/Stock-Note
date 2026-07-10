@@ -382,8 +382,8 @@ fun AssetSummaryCard(
 
 @Composable
 fun HoldingsPieChart(inventory: Map<String, Pair<Int, Double>>, prices: Map<String, Double>) {
-    // 這裡的 inventory.first 是股數/口數，計算市值時需要考慮 multiplier
-    // 但目前簡易版先維持 (股數 * 股價)，若要精確顯示期貨總曝險需傳入 multiplier
+    // 這裡的 inventory.first 是股數
+    // 目前顯示 (股數 * 股價)
     // 這裡我們假設傳進來的 inventory 已經處理過，或者我們只顯示 "股數/口數 * 價格" 的概念值
     val dataPoints = inventory.map { (symbol, data) ->
         val value = data.first * (prices[symbol] ?: 0.0)
@@ -539,8 +539,7 @@ fun HoldingsDetailDialog(
                         Box(modifier = Modifier.fillMaxWidth().combinedClickable(onClick = {}, onLongClick = { onDeleteTransaction(t) }).padding(vertical = 8.dp)) {
                             Column {
                                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                    val assetTypeStr = ""
-                                    Text("${if (t.type == TransactionType.BUY) "買入" else "賣出"}$assetTypeStr", color = if (t.type == TransactionType.BUY) Color.Red else Color.Green, fontWeight = FontWeight.Bold)
+                                    Text(if (t.type == TransactionType.BUY) "買入" else "賣出", color = if (t.type == TransactionType.BUY) Color.Red else Color.Green, fontWeight = FontWeight.Bold)
                                     Text(t.date, style = MaterialTheme.typography.bodySmall)
                                 }
                                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {

@@ -120,4 +120,19 @@ class TransactionRepository @Inject constructor(
     suspend fun getAccountById(id: Long): Account? {
         return transactionDao.getAccountById(id)
     }
+
+    suspend fun importTransactionsToNewAccount(accountName: String, items: List<TransactionItem>): Long {
+        val newAccountId = transactionDao.insertAccount(
+            Account(
+                name = accountName,
+                currency = "TWD"
+            )
+        )
+        
+        val entities = items.map { 
+            TransactionMapper.toEntity(it.copy(accountId = newAccountId))
+        }
+        transactionDao.upsertTransactions(entities)
+        return newAccountId
+    }
 }

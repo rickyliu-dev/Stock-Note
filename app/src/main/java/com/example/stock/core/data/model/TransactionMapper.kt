@@ -17,9 +17,9 @@ data class TransactionItem(
     val name: String,
     val price: Double,
     val shares: Int,
-    val multiplier: Double,
     val date: LocalDate,
     val fee: Double,
+    val tax: Double = 0.0,
     val note: String,
     val dividend: Double,
     val total: Double,
@@ -39,13 +39,13 @@ object TransactionMapper {
             name = entity.name,
             price = entity.price,
             shares = entity.shares,
-            multiplier = entity.multiplier,
             date = try {
                 LocalDate.parse(entity.date)
             } catch (e: Exception) {
                 LocalDate(1970, 1, 1) // 或者其他預設值
             },
             fee = entity.fee,
+            tax = entity.tax,
             note = entity.note,
             dividend = entity.dividend,
             total = entity.total,
@@ -62,9 +62,9 @@ object TransactionMapper {
             name = item.name,
             price = item.price,
             shares = item.shares,
-            multiplier = item.multiplier,
             date = item.date.toString(), // LocalDate.toString() 預設就是 ISO 格式
             fee = item.fee,
+            tax = item.tax,
             note = item.note,
             dividend = item.dividend,
             total = item.total,
