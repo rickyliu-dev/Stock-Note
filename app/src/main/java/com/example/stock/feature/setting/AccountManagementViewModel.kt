@@ -8,6 +8,7 @@ import com.example.stock.core.data.repository.TransactionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -53,9 +54,20 @@ class AccountManagementViewModel @Inject constructor(
 
     fun deleteAccount(account: Account) {
         viewModelScope.launch {
-            // 在刪除帳戶前，你可以根據需求決定是否要先檢查該帳戶下是否有交易
-            // 目前 Room 設定可能是 Cascade Delete
             transactionRepository.deleteAccount(account)
+            
+            // 如果刪除的是當前選取的帳戶，則切換到剩餘的第一個帳戶
+            val currentId = settingsRepository.currentAccountIdFlow.first()
+            if (account.id == currentId) {
+                val remaining = transactionRepository.allAccounts.first()
+                if (remaining.isNotEmpty()) {
+                    settingsRepository.setCurrentAccountId(remaining.first().id)
+                } else {
+                    // 如果沒有帳戶了，由 Repository 初始化邏輯建立或在此建立
+                    // 這裡先設回 1L，Repository.init 通常會確保 1L 存在
+                    settingsRepository.setCurrentAccountId(1L)
+                }
+            }
         }
     }
 

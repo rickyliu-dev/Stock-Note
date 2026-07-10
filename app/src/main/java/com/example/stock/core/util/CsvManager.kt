@@ -13,8 +13,8 @@ import java.nio.charset.Charset
  */
 object CsvManager {
 
-    // 定義匯出時的標準 Header
-    private val EXPORT_HEADER = listOf("ID", "AccountId", "Type", "Symbol", "Name", "Price", "Shares", "Multiplier", "Date", "Fee", "Note", "Dividend", "Total", "ParticipatingShares")
+    // 定義匯出時的標準 Header (包含所有 14 個欄位)
+    private val EXPORT_HEADER = listOf("ID", "AccountId", "Type", "Symbol", "Name", "Price", "Shares", "Date", "Fee", "Tax", "Note", "Dividend", "Total", "ParticipatingShares")
 
     /**
      * 將交易紀錄匯出為 CSV 字串
@@ -29,13 +29,13 @@ object CsvManager {
                 item.accountId,
                 item.type.name,
                 item.symbol,
-                "\"${item.name}\"", // 處理名稱可能含逗號
+                "\"${item.name.replace("\"", "\"\"")}\"", // 處理名稱含引號或逗號
                 item.price,
                 item.shares,
-                item.multiplier,
                 item.date.toString(),
                 item.fee,
-                "\"${item.note}\"",
+                item.tax,
+                "\"${item.note.replace("\"", "\"\"")}\"",
                 item.dividend,
                 item.total,
                 item.participatingShares
@@ -93,8 +93,6 @@ object CsvManager {
                         ?: customValues["price"]?.toDoubleOrNull() ?: 0.0,
                     shares = mapping["shares"]?.let { columns.getOrNull(it)?.toIntOrNull() } 
                         ?: customValues["shares"]?.toIntOrNull() ?: 0,
-                    multiplier = mapping["multiplier"]?.let { columns.getOrNull(it)?.toDoubleOrNull() } 
-                        ?: customValues["multiplier"]?.toDoubleOrNull() ?: 1.0,
                     date = mapping["date"]?.let { columns.getOrNull(it)?.let { d -> try { LocalDate.parse(d) } catch(e: Exception) { null } } } 
                         ?: customValues["date"]?.let { try { LocalDate.parse(it) } catch(e: Exception) { null } } ?: LocalDate(1970, 1, 1),
                     fee = mapping["fee"]?.let { columns.getOrNull(it)?.toDoubleOrNull() } 

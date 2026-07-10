@@ -1,6 +1,7 @@
 package com.example.stock.core.data
 
 import com.example.stock.core.data.model.TransactionType
+import kotlin.math.ceil
 import kotlin.math.floor
 
 /**
@@ -9,8 +10,8 @@ import kotlin.math.floor
 interface FinancialCalculator {
     /**
      * 計算台股手續費：
-     * 1. 原始手續費 = subtotal * feeRate / 100 (無條件捨去)
-     * 2. 折扣後手續費 = 原始手續費 * discount / 10 (無條件捨去)
+     * 1. 原始手續費 = subtotal * feeRate / 100 (無條件進位)
+     * 2. 折扣後手續費 = 原始手續費 * discount / 10 (無條件進位)
      * 3. 取大值 (折扣後手續費, 最低手續費)
      */
     fun calculateFee(
@@ -20,7 +21,10 @@ interface FinancialCalculator {
         minFee: Double
     ): Double
 
-    fun calculateTax(subtotal: Double, isEtf: Boolean = false): Double
+    fun calculateTax(
+        subtotal: Double,
+        isEtf: Boolean = false
+    ): Double
 
     fun calculateFinalTotal(
         type: TransactionType,
@@ -45,11 +49,10 @@ interface FinancialCalculator {
 
     /**
      * 計算減資後的總股數：
-     * (1 - 減資比例) * 減資前股數
-     * 在台灣，減資通常以「每股退還多少錢」或「減資百分比」表示。
-     * 這裡我們統一使用： price 為退還金額 (或比例換算)，shares 為減資前股數。
+     * 如果是現金減資，price 為退還金額 (每股)，減資比例 = price / 10
+     * 減資後股數 = beforeShares * (1 - price / 10)
      */
-    fun calculateReductionShares(afterRatio: Double, beforeShares: Double): Int
+    fun calculateReductionShares(price: Double, beforeShares: Double): Int
 }
 
 class TaiwanFinancialCalculator : FinancialCalculator {
@@ -61,39 +64,46 @@ class TaiwanFinancialCalculator : FinancialCalculator {
         minFee: Double
     ): Double {
         if (subtotal <= 0) return 0.0
-        
-        // 台股精確公式修正：
-        // 費率(feeRate) 例如 0.1425 (%)
-        // 折扣(discount) 例如 6 (折)
-        
-        // 1. 原始手續費 = 成交金額 * 費率(%)
-        // 4000 * (0.1425 / 100) = 5.7
-        val rawFeeValue = subtotal * (feeRate / 100.0)
-        
-        // 2. 台股規則：原始手續費無條件捨去
-        // floor(5.7) = 5
-        val rawFeeFloor = floor(rawFeeValue)
-        
-        // 3. 計算折扣後手續費並再次捨去
-        // 5 * (6 / 10) = 3.0 -> floor(3.0) = 3
-        val discountedFee = floor(rawFeeFloor * (discount / 10.0))
 
-        // 4. 與最低手續費 (低收) 比較
-        return maxOf(minFee, discountedFee)
+        // 1. 原始手續費 = 成交金額 * 費率(%)
+        val rawFeeValue = subtotal * (feeRate / 100.0)
+
+        // 2. 直接計算折扣後手續費（保持浮點數精準度，最後再一起捨去）
+        val discountedFeeValue = rawFeeValue * discount / 10.0
+
+        // 3. 依國泰官方規範：元以下無條件捨去
+        val finalCalculatedFee = floor(discountedFeeValue)
+
+        // 4. 與最低手續費 (低收 1 元) 比較，取其大者
+        return maxOf(minFee, finalCalculatedFee)
     }
 
     override fun calculateTax(subtotal: Double, isEtf: Boolean): Double {
-        // 台股證交稅也是無條件捨去
-        val rate = if (isEtf) MarketConstants.Taiwan.ETF_TAX_RATE else MarketConstants.Taiwan.TRANSACTION_TAX_RATE
-        return floor(subtotal * rate)
+        if (subtotal <= 0) return 0.0
+
+        // 1. 取得對應稅率
+        val rate = if (isEtf) {
+            MarketConstants.Taiwan.ETF_TAX_RATE
+        } else {
+            MarketConstants.Taiwan.TRANSACTION_TAX_RATE
+        }
+
+        // 2. 元以下無條件捨去
+        val calculatedTax = floor(subtotal * rate)
+
+        // 3. 關鍵修正：若捨去後小於 1 元（即為 0.0），則強制以 1 元計收
+        return if (calculatedTax < 1.0) 1.0 else calculatedTax
     }
 
     override fun isTaiwanEtf(symbol: String): Boolean {
-        // 台灣 ETF 判斷邏輯：
-        // 1. 00 開頭 (如 0050, 0056, 00878)
-        // 2. 01 開頭的權證或特定類型 (在此簡化為 00 開頭)
-        // 3. 長度可能為 4~6 碼純數字
-        return (symbol.startsWith("00") || symbol.startsWith("01")) && symbol.all { it.isDigit() }
+        // 台灣 ETF 與權證 判斷邏輯：
+        // 1. ETF: 00 開頭 (如 0050, 0056, 00878)
+        // 2. 權證: 6 碼數字為主，或特定的權證代碼
+        // 3. 2023/11 起權證證交稅降至 0.1%，與 ETF 相同
+        val baseSymbol = symbol.substringBefore(".")
+        val isEtf = (baseSymbol.startsWith("00") || baseSymbol.startsWith("01")) && baseSymbol.all { it.isDigit() }
+        val isWarrant = baseSymbol.length == 6 && baseSymbol.any { it.isDigit() } // 簡單判定：6 碼通常是權證
+        return isEtf || isWarrant
     }
 
     override fun calculateFinalTotal(
@@ -110,7 +120,7 @@ class TaiwanFinancialCalculator : FinancialCalculator {
             TransactionType.DEPOSIT -> subtotal
             TransactionType.WITHDRAW -> subtotal
             TransactionType.ADJUSTMENT -> subtotal
-            TransactionType.CAPITAL_REDUCTION -> subtotal // 減資退還現金
+            TransactionType.CAPITAL_REDUCTION -> maxOf(0.0, subtotal - fee) // 減資退還現金需扣除手續費
             TransactionType.SPLIT -> 0.0 // 分割不涉及現金流
         }
     }
@@ -124,8 +134,10 @@ class TaiwanFinancialCalculator : FinancialCalculator {
         return floor(ratio * beforeShares).toInt()
     }
 
-    override fun calculateReductionShares(afterRatio: Double, beforeShares: Double): Int {
-        // 假設 afterRatio 是剩下的比例 (例如減資 20%，則 afterRatio = 0.8)
-        return floor(afterRatio * beforeShares).toInt()
+    override fun calculateReductionShares(price: Double, beforeShares: Double): Int {
+        // 台灣現金減資公式：減資後股數 = 減資前股數 * (1 - (每股退還現金 / 10))
+        // 注意：這裡假設面額為 10 元
+        val afterRatio = 1.0 - (price / 10.0)
+        return floor(maxOf(0.0, afterRatio) * beforeShares).toInt()
     }
 }

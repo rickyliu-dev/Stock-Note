@@ -77,6 +77,18 @@ fun SettingsMainScreen(
         }
     }
 
+    // --- 匯入標準 CSV (12欄位) 的 Launcher ---
+    val standardCsvImportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            viewModel.importStandardCsv(context, it) { success, message ->
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                if (success) onBack()
+            }
+        }
+    }
+
     // --- CSV 欄位對應對話框 ---
     viewModel.csvHeader?.let { header ->
         CsvImportDialog(
@@ -317,10 +329,66 @@ fun SettingsMainScreen(
 
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                         Button(
+                            onClick = {
+                                val prompt = """
+                                    請分析附圖中的股票交易對帳單資訊，並根據以下格式生成 CSV 檔案。
+
+                                    1. CSV 欄位順序（Header）：
+                                    type,symbol,name,price,shares,date,fee,tax,note,dividend,total,participatingShares
+
+                                    2. 欄位說明與格式規範：
+                                    - type (交易類型)：請務必轉換為以下對應的英文列舉值：
+                                        - 買入 -> BUY
+                                        - 賣出 -> SELL
+                                        - 現金股息 (領現金) -> DIVIDEND
+                                        - 股票股利 (配股) -> STOCK_DIVIDEND
+                                        - 入金 (存入現金) -> DEPOSIT
+                                        - 出金 (領出資金) -> WITHDRAW
+                                        - 調整 (利息、退傭) -> ADJUSTMENT
+                                        - 減資 (退還現金) -> CAPITAL_REDUCTION
+                                        - 股票分割 -> SPLIT
+                                    - symbol (股票代號)：字串（例如：2330）。
+                                    - name (名稱)：股票或項目名稱。
+                                    - price (價格/單價)：數字（Double），預設為 0.0。
+                                    - shares (股數)：整數（Int），預設為 0。
+                                    - date (日期)：格式請統一為 YYYY-MM-DD。
+                                    - fee (手續費)：數字（Double），預設為 0.0。
+                                    - tax (證交稅)：數字（Double），僅賣出時可能有，預設為 0.0。
+                                    - note (備註)：任何額外的文字說明。
+                                    - dividend (股息)：數字（Double），預設為 0.0。
+                                    - total (總金額)：數字（Double），該筆交易的最終結算金額。
+                                    - participatingShares (參與股數)：整數（Int），用於除權息計算，預設為 0。
+
+                                    3. 注意事項：
+                                    - 如果圖中某個欄位資訊缺失，請填入預設值（數字填 0，文字留空）。
+                                    - 請直接輸出 CSV 內容，不要包含額外的解釋文字。
+                                    - 請確保每一列的欄位數量與 Header 完全一致。
+                                """.trimIndent()
+                                scope.launch {
+                                    val clipData = ClipData.newPlainText("AI_PROMPT", prompt)
+                                    clipboard.setClipEntry(clipData.toClipEntry())
+                                }
+                                Toast.makeText(context, "已複製 AI 圖片轉 CSV 指令", Toast.LENGTH_LONG).show()
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                        ) {
+                            Text("📋 複製 AI 圖片轉 CSV 指令")
+                        }
+
+                        Button(
+                            onClick = { standardCsvImportLauncher.launch("text/*") },
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                        ) {
+                            Text("📊 匯入正式 CSV (12欄位)")
+                        }
+
+                        Button(
                             onClick = { importLauncher.launch("text/*") },
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                         ) {
-                            Text("📥 匯入資料 (CSV)")
+                            Text("📥 匯入測試 CSV")
                         }
 
                         Button(

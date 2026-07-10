@@ -11,7 +11,7 @@ import com.example.stock.core.data.model.TransactionDao
 
 @Database(
     entities = [Transaction::class, StockPriceEntity::class, Account::class],
-    version = 3
+    version = 25
 )
 @TypeConverters(Converters::class)
 abstract class StockDatabase : RoomDatabase() {

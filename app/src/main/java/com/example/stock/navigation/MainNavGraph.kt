@@ -44,11 +44,11 @@ fun MainNavGraph(
             onBackClick = {
                 navController.popBackStack()
             },
-            onNavigateToAdd = { symbol ->
-                navController.navigate(AllScreens.AddTransaction.createRoute(symbol))
+            onNavigateToAdd = { symbol, name ->
+                navController.navigate(AllScreens.AddTransaction.createRoute(symbol, name = name))
             },
-            onNavigateToEdit = { symbol, id ->
-                navController.navigate(AllScreens.AddTransaction.createRoute(symbol, id))
+            onNavigateToEdit = { symbol, name, id ->
+                navController.navigate(AllScreens.AddTransaction.createRoute(symbol = symbol, name = name, id = id))
             }
         )
 

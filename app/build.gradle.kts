@@ -1,3 +1,4 @@
+import com.google.firebase.appdistribution.gradle.firebaseAppDistribution
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
@@ -9,6 +10,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     id("com.google.gms.google-services")
+    id("com.google.firebase.appdistribution")
 }
 
 android {
@@ -32,14 +34,21 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+
+        create("release") {
+            storeFile = rootProject.file("keystore/release_key.keystore")
+            storePassword = "antony8816"
+            keyAlias = "stock_key"
+            keyPassword = "antony8816"
+        }
     }
 
     defaultConfig {
         applicationId = "com.example.stock"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = 2
+        versionName = "0.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -50,17 +59,30 @@ android {
     }
 
     buildTypes {
-        debug {
+        getByName("debug") {
             // 直接指定，不要用 if 判斷。
             // 如果檔案不存在，編譯時會報 "File not found" 的錯誤，這才是我們要的。
             signingConfig = signingConfigs.getByName("sharedDebug")
         }
-        release {
-            isMinifyEnabled = false
+        getByName("release") {
+            // 指定使用上面定義的 release 金鑰
+            signingConfig = signingConfigs.getByName("release")
+
+            isMinifyEnabled = false // 若要正式上架建議改為 true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+
+            // 新增：Firebase App Distribution 配置
+            firebaseAppDistribution {
+                artifactType = "APK"
+                groups = "alpha-testers"
+                releaseNotes = "第二版 Release 測試"
+
+                // 關鍵：讓 Gradle 直接讀取這份憑證，跳過所有登入步驟
+                serviceCredentialsFile = rootProject.file("app/credentials.json").absolutePath
+            }
         }
     }
     compileOptions {
@@ -146,6 +168,7 @@ dependencies {
     implementation(libs.guava)
     implementation(libs.firebase.auth)
     implementation(libs.okhttp)
+    implementation(libs.poi.ooxml)
 
     // --- Testing ---
     testImplementation(libs.junit)

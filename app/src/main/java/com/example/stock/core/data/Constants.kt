@@ -29,6 +29,12 @@ object MarketConstants {
 
         /** 手續費折數 */
         const val DISCOUNT = "6"
+
+        /** 期貨交易稅率 */
+        const val FUTURE_TAX_RATE = 0.00002
+
+        /** 選擇權交易稅率 */
+        const val OPTION_TAX_RATE = 0.001
     }
 
     // 美股相關規則 (未來擴充用)

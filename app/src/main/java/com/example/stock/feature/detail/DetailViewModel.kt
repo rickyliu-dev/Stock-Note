@@ -8,33 +8,33 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.stock.core.data.enumClass.DashboardIds
+import com.example.stock.core.data.model.Account
 import com.example.stock.core.data.model.TransactionItem
-import com.example.stock.core.data.model.TransactionType
 import com.example.stock.core.data.repository.SettingsRepository
 import com.example.stock.core.data.repository.TransactionRepository
+import com.example.stock.core.domain.GetStockInventoryUseCase
+import com.example.stock.core.domain.model.StockPosition
 import com.example.stock.core.ui.component.toCurrencyString
 import com.example.stock.core.ui.theme.LossColor
 import com.example.stock.core.ui.theme.ProfitColor
-import com.example.stock.core.data.model.Account
 import com.example.stock.feature.detail.component.FormattedValue
 import com.example.stock.feature.detail.component.ProfitDisplay
 import com.example.stock.feature.detail.component.StockSummary
 import com.example.stock.feature.setting.DashboardSettingItem
 import com.example.stock.navigation.AllScreens
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * 詳情頁 ViewModel (重構後：引用統一損益算法，確保資料一致)
+ */
 @HiltViewModel
 class DetailViewModel @Inject constructor(
     private val repository: TransactionRepository,
     private val settingsRepository: SettingsRepository,
-    private val financialCalculator: com.example.stock.core.data.FinancialCalculator,
+    private val getStockInventoryUseCase: GetStockInventoryUseCase,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     val symbol: String = savedStateHandle[AllScreens.Companion.ARG_SYMBOL] ?: ""
@@ -43,12 +43,23 @@ class DetailViewModel @Inject constructor(
     val currentAccountId: StateFlow<Long> = settingsRepository.currentAccountIdFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1L)
 
+    private val _isCumulative = MutableStateFlow(true)
+    val isCumulativeFlow = _isCumulative.asStateFlow()
+    var isCumulative by mutableStateOf(true)
+        private set
+
+    fun toggleProfitMode() {
+        isCumulative = !isCumulative
+        _isCumulative.value = isCumulative
+    }
+
     var isSelectionMode by mutableStateOf(false)
         private set
 
     var selectedIds by mutableStateOf(emptySet<Long>())
         private set
 
+    // 所有的相關交易 (用於列表顯示)
     val relatedTransactions = combine(
         repository.transactionsDesc,
         currentAccountId
@@ -58,181 +69,109 @@ class DetailViewModel @Inject constructor(
         } else {
             list.filter { it.symbol == symbol && it.accountId == accountId }
         }
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.Companion.WhileSubscribed(5000),
-        emptyList()
-    )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val includeDividends: StateFlow<Boolean> = settingsRepository.includeDividendsFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-
-    private val userSettings = settingsRepository.twSettingsFlow // 假設這是你的全域設定 Flow
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
-            SettingsRepository.TwSettings()
-        )
-
-    private val baseSummary = combine(
+    // 核心數據流：調用統一的 UseCase
+    private val positionState: StateFlow<StockPosition?> = combine(
         relatedTransactions,
         repository.stockPricesFlow,
-        userSettings,
+        settingsRepository.twSettingsFlow,
+        settingsRepository.costBasisMethodFlow,
+        settingsRepository.includeDividendsFlow,
         repository.allAccounts,
         currentAccountId
-    ) { transactions, priceMap, settings, accounts, accId ->
+    ) { args ->
+        val transactions = args[0] as List<TransactionItem>
+        val quotes = args[1] as Map<String, com.example.stock.core.data.dataClass.StockQuote>
+        val settings = args[2] as SettingsRepository.TwSettings
+        val method = args[3] as com.example.stock.core.data.model.CostBasisMethod
+        val includeDiv = args[4] as Boolean
+        val accounts = args[5] as List<Account>
+        val accId = args[6] as Long
+
         if (symbol == "CASH") {
+            // 現金帳戶特殊處理
+            val calcResult = getStockInventoryUseCase(transactions, quotes, settings, method, includeDiv)
             val currentAccount = accounts.find { it.id == accId }
-            val initialBalance = currentAccount?.initialBalance ?: 0.0
+            val balance = (currentAccount?.initialBalance ?: 0.0) + calcResult.totalCashFlow
             
-            // 計算現金流入 (存款, 出售股票所得, 股息)
-            val cashIn = transactions.sumOf { 
-                when (it.type) {
-                    TransactionType.DEPOSIT -> it.total
-                    TransactionType.SELL -> it.total
-                    TransactionType.DIVIDEND -> it.dividend
-                    else -> 0.0
-                }
-            }
-            
-            // 計算現金流出 (提款, 購買股票花費)
-            val cashOut = transactions.sumOf {
-                when (it.type) {
-                    TransactionType.WITHDRAW -> it.total
-                    TransactionType.BUY -> it.total
-                    else -> 0.0
-                }
-            }
-            
-            val balance = initialBalance + cashIn - cashOut
-            
-            return@combine StockSummary(
-                remainingShares = 0.0,
-                avgCost = 0.0,
-                totalBuyAmount = 0.0,
-                totalSellAmount = 0.0,
-                dividendAmount = 0.0,
+            StockPosition(
+                symbol = "CASH",
+                name = "現金帳戶",
                 currentPrice = balance,
-                yesterdayPrice = balance,
                 netMarketValue = balance,
-                yesterdayNetValue = balance,
-                buyShares = 0.0,
-                sellShares = 0.0,
-                avgBuyAmount = 0.0
+                yesterdayNetValue = balance
             )
-        }
-
-        val quote = priceMap[symbol]
-        val current = quote?.currentPrice ?: 0.0
-        val yesterday = current - (quote?.change ?: 0.0)
-
-        val buyTs = transactions.filter { it.type == TransactionType.BUY || it.type == TransactionType.STOCK_DIVIDEND }
-        val sellTs = transactions.filter { it.type == TransactionType.SELL }
-        val divTs = transactions.filter { it.type == TransactionType.DIVIDEND }
-
-        val bShares = buyTs.sumOf { it.shares.toDouble() }
-        val sShares = sellTs.sumOf { it.shares.toDouble() }
-        val bAmount = buyTs.sumOf { it.total }
-        val sAmount = sellTs.sumOf { it.total }
-
-        val pureBuyTotal = buyTs.sumOf { trans ->
-            if (trans.type == TransactionType.BUY) {
-                trans.price * trans.shares.toDouble()
-            } else {
-                0.0
-            }
-        }
-
-        val currentGross = (bShares - sShares) * current
-        val yesterdayGross = (bShares - sShares) * yesterday
-
-        val currentNet = if (settings.showPreDeduct) {
-            val estFee = financialCalculator.calculateFee(
-                subtotal = currentGross,
-                feeRate = settings.feeRate.toDoubleOrNull() ?: 0.1425,
-                discount = settings.discount.toDoubleOrNull() ?: 10.0,
-                minFee = settings.minFee.toDoubleOrNull() ?: 20.0
-            )
-            val estTax = financialCalculator.calculateTax(currentGross)
-            currentGross - estFee - estTax
         } else {
-            currentGross
+            val calcResult = getStockInventoryUseCase(transactions, quotes, settings, method, includeDiv)
+            calcResult.positions[symbol]
         }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-        val yesterdayNet = if (settings.showPreDeduct) {
-            val estFee = financialCalculator.calculateFee(
-                subtotal = yesterdayGross,
-                feeRate = settings.feeRate.toDoubleOrNull() ?: 0.1425,
-                discount = settings.discount.toDoubleOrNull() ?: 10.0,
-                minFee = settings.minFee.toDoubleOrNull() ?: 20.0
+    // 為了相容現有的 UI Component，將 StockPosition 映射回 StockSummary
+    val baseSummary: StateFlow<StockSummary> = positionState.map { pos ->
+        pos?.let {
+            StockSummary(
+                remainingShares = it.shares,
+                avgCost = it.avgCost,
+                totalBuyAmount = it.totalBuyAmount,
+                totalSellAmount = it.totalSellAmount,
+                dividendAmount = it.dividendAmount,
+                currentPrice = it.currentPrice,
+                yesterdayPrice = it.yesterdayPrice,
+                netMarketValue = it.netMarketValue,
+                yesterdayNetValue = it.yesterdayNetValue,
+                buyShares = it.buyShares,
+                sellShares = it.sellShares,
+                avgBuyAmount = it.avgBuyPrice
             )
-            val estTax = financialCalculator.calculateTax(yesterdayGross)
-            yesterdayGross - estFee - estTax
-        } else {
-            yesterdayGross
-        }
-        StockSummary(
-            remainingShares = bShares - sShares,
-            avgCost = if (bShares > 0) bAmount / bShares else 0.0,
-            totalBuyAmount = bAmount,
-            totalSellAmount = sAmount,
-            dividendAmount = divTs.sumOf { it.dividend },
-            currentPrice = current,
-            yesterdayPrice = yesterday,
-            netMarketValue = currentNet,
-            yesterdayNetValue = yesterdayNet,
-            buyShares = bShares,
-            sellShares = sShares,
-            avgBuyAmount = if (bShares > 0) pureBuyTotal / bShares else 0.0
-        )
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        StockSummary()
-    )
+        } ?: StockSummary()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), StockSummary())
 
-    val cumulativeProfit = combine(
-        baseSummary,
-        includeDividends
-    ) { summary, isInclude ->
+    val cumulativeProfit: StateFlow<ProfitDisplay> = combine(
+        positionState,
+        settingsRepository.includeDividendsFlow,
+        _isCumulative
+    ) { pos, includeDiv, isCum ->
+        if (pos == null) return@combine ProfitDisplay("0", "0.00%", Color.Black, 0.0)
+        
         if (symbol == "CASH") {
             return@combine ProfitDisplay(
-                amountText = summary.netMarketValue.toCurrencyString(0),
+                amountText = pos.netMarketValue.toCurrencyString(0),
                 percentageText = "帳戶餘額",
                 color = Color.Black,
-                rawValue = summary.netMarketValue
+                rawValue = pos.netMarketValue
             )
         }
 
-        val unrealizedNet = summary.netMarketValue - (summary.remainingShares * summary.avgCost)
-        val realized = summary.totalSellAmount - (summary.sellShares * summary.avgCost)
-        val totalProfit = if (isInclude) {
-            unrealizedNet + realized + summary.dividendAmount
+        // 根據新邏輯計算：(未實現 + [若累積模式則加已實現]) + [若含息則加股息]
+        val base = pos.unrealizedProfit + (if (isCum) pos.realizedProfit else 0.0)
+        val profit = if (includeDiv) base + pos.dividendAmount else base
+
+        // 修正分母邏輯：累積模式下使用總投入金額 (totalBuyAmount) 作為分母
+        val denominator = if (isCum) {
+            pos.totalBuyAmount
         } else {
-            unrealizedNet + realized
+            if (pos.shares > 0.0001) pos.totalCost else pos.totalBuyAmount
         }
+        val profitPercent = if (denominator > 0.01) (profit / denominator) * 100 else 0.0
 
-        val profitPercent = if (summary.totalBuyAmount > 0) (totalProfit / summary.totalBuyAmount) * 100 else 0.0
-
-        // 4. 決定格式與顏色
         val color = when {
-            totalProfit > 0.01 -> ProfitColor
-            totalProfit < -0.01 -> LossColor
+            profit > 0.01 -> ProfitColor
+            profit < -0.01 -> LossColor
             else -> Color.Black
         }
 
-        val prefix = if (totalProfit > 0.01) "+" else ""
-        val formattedAmount = "$prefix${totalProfit.toCurrencyString(0)}"
-        val formattedPercent = "$prefix${profitPercent.toCurrencyString(2)}%"
+        val prefix = if (profit > 0.01) "+" else ""
+        ProfitDisplay(
+            amountText = "$prefix${profit.toCurrencyString(0)}",
+            percentageText = "$prefix${profitPercent.toCurrencyString(2)}%",
+            color = color,
+            rawValue = profit
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ProfitDisplay("0", "0.00%", Color.Black, 0.0))
 
-        ProfitDisplay(formattedAmount, formattedPercent, color, totalProfit)
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        ProfitDisplay("0", "0.00%", Color.Black, 0.0)
-    )
-
-    // 預設排序（當 DataStore 還是空的時候）
+    // 資訊看板內容
     private val defaultSettings = listOf(
         DashboardSettingItem(DashboardIds.AVG_COST, "平均成本"),
         DashboardSettingItem(DashboardIds.AVG_BUY, "平均買價"),
@@ -245,81 +184,70 @@ class DetailViewModel @Inject constructor(
         DashboardSettingItem(DashboardIds.REALIZED, "已實現損益")
     )
 
-
-    private val dashboardLayout = settingsRepository.dashboardSettingsFlow.map {
-        it ?: defaultSettings
-    }
-
     val dashboardDisplayItems = combine(
-        baseSummary,
-        dashboardLayout
-    ) { summary, layout ->
-        if (symbol == "CASH") return@combine emptyList()
+        positionState,
+        settingsRepository.dashboardSettingsFlow.map { it ?: defaultSettings },
+        settingsRepository.includeDividendsFlow,
+        _isCumulative
+    ) { pos, layout, includeDiv, isCum ->
+        if (symbol == "CASH" || pos == null) return@combine emptyList()
         
-        // 只顯示勾選為「可見」的項目
         layout.filter { it.isVisible }.map { item ->
-            val result = calculateValue(item, summary)
-
-            val profitRelatedIds = setOf(
-                DashboardIds.DAILY_PROFIT,
-                DashboardIds.UNREALIZED,
-                DashboardIds.REALIZED,
-                DashboardIds.CUMULATIVE_PROFIT // 如果你有累積損益，也可以一併加進來！
-            )
-
-            val color = if (item.id in profitRelatedIds) {
-                when {
-                    result.rawValue > 0 -> ProfitColor
-                    result.rawValue < 0 -> LossColor
-                    else -> Color.Black
-                }
-            } else {
-                Color.Black
+            // 動態調整標題以符合當前模式
+            val displayItem = when (item.id) {
+                DashboardIds.UNREALIZED -> item.copy(title = if (isCum) "總損益" else "未實現損益")
+                DashboardIds.TOTAL_COST -> item.copy(title = if (isCum) "累積投入" else "庫存成本")
+                else -> item
             }
 
-            // 把結果包成 Triple 或自定義的 UI Model 傳給 Compose
-            Triple(item, result.text, color)
+            val result = calculateValue(displayItem, pos, includeDiv, isCum)
+            val color = if (item.id in setOf(DashboardIds.DAILY_PROFIT, DashboardIds.UNREALIZED, DashboardIds.REALIZED)) {
+                when {
+                    result.rawValue > 0.01 -> ProfitColor
+                    result.rawValue < -0.01 -> LossColor
+                    else -> Color.Black
+                }
+            } else Color.Black
+
+            Triple(displayItem, result.text, color)
         }
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        emptyList()
-    )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // --- 計算邏輯核心 ---
-    private fun calculateValue(
-        item: DashboardSettingItem,
-        s: StockSummary
-    ): FormattedValue {
-
+    private fun calculateValue(item: DashboardSettingItem, p: StockPosition, includeDiv: Boolean, isCum: Boolean): FormattedValue {
         val (value, needsPlusSign) = when (item.id) {
-            DashboardIds.AVG_COST -> s.avgCost to false
-            DashboardIds.AVG_BUY -> s.avgBuyAmount to false
-            DashboardIds.SHARES -> s.remainingShares to false
-            DashboardIds.MARKET_VAL -> s.netMarketValue to false
-            DashboardIds.TOTAL_COST -> s.totalBuyAmount to false
-            DashboardIds.DIVIDEND -> s.dividendAmount to false
-            DashboardIds.DAILY_PROFIT -> (s.netMarketValue - s.yesterdayNetValue) to true
-            DashboardIds.UNREALIZED -> (s.netMarketValue - (s.remainingShares * s.avgCost)) to true
-            DashboardIds.REALIZED -> (s.totalSellAmount - (s.sellShares * s.avgCost)) to true
+            DashboardIds.AVG_COST -> p.avgCost to false
+            DashboardIds.AVG_BUY -> p.avgBuyPrice to false
+            DashboardIds.SHARES -> p.shares to false
+            DashboardIds.MARKET_VAL -> p.marketValue to false
+            DashboardIds.TOTAL_COST -> {
+                // 若為累積模式，顯示歷史總投入金額；若為庫存模式，顯示當前持股的剩餘成本
+                val v = if (isCum) p.totalBuyAmount else p.totalCost
+                v to false
+            }
+            DashboardIds.DIVIDEND -> p.dividendAmount to false
+            DashboardIds.DAILY_PROFIT -> p.dailyProfit to true
+            DashboardIds.UNREALIZED -> {
+                // 這裡的「損益」項目會根據模式切換：
+                // 累積模式 = (預估淨市值 + 已實現 + [股息]) - 總投入
+                // 庫存模式 = 預估淨市值 - 剩餘持股成本
+                val base = p.unrealizedProfit + (if (isCum) p.realizedProfit else 0.0)
+                val v = if (includeDiv) base + p.dividendAmount else base
+                v to true
+            }
+            DashboardIds.REALIZED -> p.realizedProfit to true
             else -> 0.0 to false
         }
-
-        val formattedText = when {
-            value > 0 && needsPlusSign -> "+${value.toCurrencyString(0)}"
-            else -> value.toCurrencyString(0)
-        }
-
-        return FormattedValue(formattedText, value)
+        val formatted = if (value > 0.01 && needsPlusSign) "+${value.toCurrencyString(0)}" else value.toCurrencyString(0)
+        return FormattedValue(formatted, value)
     }
+
     val stockName = relatedTransactions.map { 
         if (symbol == "CASH") "現金帳戶"
         else it.firstOrNull()?.name ?: symbol 
-    }
-        .stateIn(viewModelScope, SharingStarted.Companion.WhileSubscribed(5000), if (symbol == "CASH") "現金帳戶" else symbol)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), if (symbol == "CASH") "現金帳戶" else symbol)
 
     fun deleteTransaction(t: TransactionItem) = viewModelScope.launch { repository.deleteTransactionById(t.id) }
-
+    
     fun toggleSelection(id: Long) {
         selectedIds = if (selectedIds.contains(id)) selectedIds - id else selectedIds + id
         if (selectedIds.isEmpty()) isSelectionMode = false
@@ -337,7 +265,6 @@ class DetailViewModel @Inject constructor(
 
     fun deleteSelectedTransactions() {
         viewModelScope.launch {
-            // 呼叫我們剛剛在 Repository 寫好的批次刪除
             repository.deleteTransactionsByIds(selectedIds.toList())
             exitSelectionMode()
         }
@@ -353,9 +280,5 @@ class DetailViewModel @Inject constructor(
     }
 
     val allAccounts: StateFlow<List<Account>> = repository.allAccounts
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 }

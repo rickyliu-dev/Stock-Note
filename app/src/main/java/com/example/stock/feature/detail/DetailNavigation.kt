@@ -8,8 +8,8 @@ import com.example.stock.navigation.AllScreens
 
 fun NavGraphBuilder.detailGraph(
     onBackClick: () -> Unit,
-    onNavigateToAdd: (String) -> Unit,
-    onNavigateToEdit: (String, Long) -> Unit
+    onNavigateToAdd: (String, String) -> Unit,
+    onNavigateToEdit: (String, String, Long) -> Unit
 ) {
     composable(
         route = AllScreens.Detail.route,

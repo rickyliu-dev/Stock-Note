@@ -7,6 +7,8 @@ import androidx.room.Delete
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.TypeConverter
@@ -80,10 +82,11 @@ data class Transaction(
     val name: String = "",
     val price: Double = 0.0,
     val shares: Int = 0,
-    val multiplier: Double = 1.0,
     val date: String = "",
     // 手續費
     val fee: Double = 0.0,
+    // 證交稅 (僅賣出時使用)
+    val tax: Double = 0.0,
     val note: String = "",
     // 股息
     val dividend: Double = 0.0,
@@ -127,8 +130,11 @@ interface TransactionDao {
     @Query("SELECT * FROM accounts")
     fun getAllAccounts(): Flow<List<Account>>
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAccount(account: Account): Long
+
     @Upsert
-    suspend fun upsertAccount(account: Account)
+    suspend fun upsertAccount(account: Account): Long
 
     @Delete
     suspend fun deleteAccount(account: Account)
@@ -163,8 +169,8 @@ interface TransactionDao {
     @Delete
     suspend fun deleteTransaction(transaction: Transaction)
 
-    // 自動計算總資產（考慮乘數），這就是你擔心的效能解藥！
-    @Query("SELECT SUM(price * shares * multiplier) FROM transactions WHERE type = 'BUY'")
+    // 自動計算總資產
+    @Query("SELECT SUM(price * shares) FROM transactions WHERE type = 'BUY'")
     fun getTotalMarketValue(): Flow<Double?>
 
     // 一次性取得所有清單（不使用 Flow）

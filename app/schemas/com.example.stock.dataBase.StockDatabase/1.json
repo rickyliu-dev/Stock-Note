@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "720cfa15800836577c0aa35d62fba9ee",
+    "identityHash": "587946dae56af824f88025a2b19356bf",
     "entities": [
       {
         "tableName": "transactions",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` TEXT NOT NULL, `symbol` TEXT NOT NULL, `name` TEXT NOT NULL, `price` REAL NOT NULL, `shares` INTEGER NOT NULL, `multiplier` REAL NOT NULL, `date` TEXT NOT NULL, `fee` REAL NOT NULL, `note` TEXT NOT NULL, `dividend` REAL NOT NULL, `total` REAL NOT NULL, `participatingShares` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `accountId` INTEGER NOT NULL, `type` TEXT NOT NULL, `assetType` TEXT NOT NULL, `symbol` TEXT NOT NULL, `name` TEXT NOT NULL, `price` REAL NOT NULL, `shares` INTEGER NOT NULL, `multiplier` REAL NOT NULL, `date` TEXT NOT NULL, `fee` REAL NOT NULL, `tax` REAL NOT NULL, `note` TEXT NOT NULL, `dividend` REAL NOT NULL, `total` REAL NOT NULL, `participatingShares` INTEGER NOT NULL, FOREIGN KEY(`accountId`) REFERENCES `accounts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -15,8 +15,20 @@
             "notNull": true
           },
           {
+            "fieldPath": "accountId",
+            "columnName": "accountId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
             "fieldPath": "type",
             "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "assetType",
+            "columnName": "assetType",
             "affinity": "TEXT",
             "notNull": true
           },
@@ -63,6 +75,12 @@
             "notNull": true
           },
           {
+            "fieldPath": "tax",
+            "columnName": "tax",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
             "fieldPath": "note",
             "columnName": "note",
             "affinity": "TEXT",
@@ -93,8 +111,30 @@
             "id"
           ]
         },
-        "indices": [],
-        "foreignKeys": []
+        "indices": [
+          {
+            "name": "index_transactions_accountId",
+            "unique": false,
+            "columnNames": [
+              "accountId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_transactions_accountId` ON `${TABLE_NAME}` (`accountId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "accounts",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "accountId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
       },
       {
         "tableName": "stock_prices",
@@ -133,12 +173,62 @@
         },
         "indices": [],
         "foreignKeys": []
+      },
+      {
+        "tableName": "accounts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `currency` TEXT NOT NULL, `initialBalance` REAL NOT NULL, `note` TEXT NOT NULL, `isCashManagementEnabled` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "currency",
+            "columnName": "currency",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "initialBalance",
+            "columnName": "initialBalance",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isCashManagementEnabled",
+            "columnName": "isCashManagementEnabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
       }
     ],
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '720cfa15800836577c0aa35d62fba9ee')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '587946dae56af824f88025a2b19356bf')"
     ]
   }
 }

@@ -1,5 +1,7 @@
 package com.example.stock.feature.home
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -22,6 +24,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -56,14 +59,15 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -73,6 +77,10 @@ import com.example.stock.core.ui.component.item.StockRowItem
 import com.example.stock.core.ui.component.modifier.secretClick
 import com.example.stock.feature.home.component.DashboardHeader
 import com.example.stock.feature.home.component.dialog.UnlockPremiumDialog
+import com.example.stock.core.data.model.Account
+import com.example.stock.core.data.model.TransactionItem
+import com.example.stock.feature.home.component.PortfolioSummary
+import com.example.stock.feature.home.component.StockDisplayItem
 import kotlinx.coroutines.flow.collectLatest
 
 import com.example.stock.MainViewModel
@@ -87,13 +95,12 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit
 ) {
     // 從 VM 觀察資料
-    val transactions by viewModel.transactions.collectAsState()
-    val assetDistribution by viewModel.assetDistribution.collectAsState()
-    val assetHistory by viewModel.assetHistory.collectAsState()
-    val isUpdating by viewModel.isUpdating.collectAsState()
-    val activeList by viewModel.activeStockList.collectAsState()
-    val closedList by viewModel.closedStockList.collectAsState()
-    val isCashEnabled by viewModel.isCashManagementEnabled.collectAsState()
+    val assetDistribution by viewModel.assetDistribution.collectAsStateWithLifecycle()
+    val assetHistory by viewModel.assetHistory.collectAsStateWithLifecycle()
+    val isUpdating by viewModel.isUpdating.collectAsStateWithLifecycle()
+    val activeList by viewModel.activeStockList.collectAsStateWithLifecycle()
+    val closedList by viewModel.closedStockList.collectAsStateWithLifecycle()
+    val isCashEnabled by viewModel.isCashManagementEnabled.collectAsStateWithLifecycle()
 
     // 多選模式
     val isSelectionMode = viewModel.isSelectionMode
@@ -103,8 +110,8 @@ fun HomeScreen(
     var targetAccountForMove by remember { mutableStateOf<com.example.stock.core.data.model.Account?>(null) }
 
     // 2. 🟢 從 MainViewModel 觀察現在選中哪個分頁 (0 = 持有中, 1 = 已清倉)
-    val selectedTabIndex by mainViewModel.selectedTabIndex.collectAsState()
-    val lastUpdateTimestamp by viewModel.lastUpdateTimestamp.collectAsState()
+    val selectedTabIndex by mainViewModel.selectedTabIndex.collectAsStateWithLifecycle()
+    val lastUpdateTimestamp by viewModel.lastUpdateTimestamp.collectAsStateWithLifecycle()
 
     // 格式化最後更新時間
     val lastUpdateText = remember(lastUpdateTimestamp) {
@@ -137,12 +144,19 @@ fun HomeScreen(
         }
     }
 
-    val summary by viewModel.portfolioSummary.collectAsState()
-    val searchQuery by viewModel.searchQuery.collectAsState()
+    val summary by viewModel.portfolioSummary.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+
+    val context = LocalContext.current
+    val excelPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { viewModel.importFromExcel(context, it) }
+    }
 
     // 帳戶相關
-    val allAccounts by viewModel.allAccounts.collectAsState()
-    val currentAccountId by viewModel.currentAccountId.collectAsState()
+    val allAccounts by viewModel.allAccounts.collectAsStateWithLifecycle()
+    val currentAccountId by viewModel.currentAccountId.collectAsStateWithLifecycle()
     var showAccountMenu by remember { mutableStateOf(false) }
     val currentAccount = allAccounts.find { it.id == currentAccountId }
     val currentAccountName = currentAccount?.name ?: "預設帳戶"
@@ -153,7 +167,7 @@ fun HomeScreen(
         summary.unrealizedProfit
     }
 
-    val includeDividends by viewModel.includeDividends.collectAsState()
+    val includeDividends by viewModel.includeDividends.collectAsStateWithLifecycle()
 
     Scaffold(
         snackbarHost = {
@@ -303,7 +317,7 @@ fun HomeScreen(
                     totalProfit = displayProfit,
                     dailyProfit = summary.dailyProfit,
                     isCumulative = viewModel.isCumulative,
-                    onToggleMode = { viewModel.isCumulative = !viewModel.isCumulative },
+                    onToggleMode = { viewModel.toggleProfitMode() },
                     includeDividends = includeDividends,
                     onToggleDividends = { isChecked ->
                         viewModel.toggleIncludeDividends(isChecked)
@@ -403,7 +417,13 @@ fun HomeScreen(
                     if (selectedTabIndex == 0) {
                         Text("股價", modifier = Modifier.weight(1f), fontSize = 14.sp, color = Color.Gray, textAlign = TextAlign.End)
                         Text("均價", modifier = Modifier.weight(1f), fontSize = 14.sp, color = Color.Gray, textAlign = TextAlign.End)
-                        Text("未實現損益", modifier = Modifier.weight(1.1f), fontSize = 14.sp, color = Color.Gray, textAlign = TextAlign.End)
+                        Text(
+                            text = if (viewModel.isCumulative) "總損益" else "未實現損益",
+                            modifier = Modifier.weight(1.1f),
+                            fontSize = 14.sp,
+                            color = Color.Gray,
+                            textAlign = TextAlign.End
+                        )
                     } else {
                         Text("現價", modifier = Modifier.weight(1f), fontSize = 14.sp, color = Color.Gray, textAlign = TextAlign.End)
                         Spacer(modifier = Modifier.weight(1f))
@@ -564,10 +584,7 @@ fun HomeScreen(
             text = { Text("確定要刪除 $symbol 的所有紀錄嗎？") },
             confirmButton = {
                 Button(onClick = {
-                    // 請注意：這裡建議在 ViewModel 新增 deleteStock(symbol) 方法
-                    // 暫時用舊邏輯
-                    val toRemove = transactions.filter { it.symbol == symbol }
-                    toRemove.forEach { viewModel.deleteTransaction(it) }
+                    viewModel.deleteStock(symbol)
                     stockToDelete = null
                 }) { Text("刪除") }
             },
