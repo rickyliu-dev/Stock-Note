@@ -113,15 +113,15 @@ class TaiwanFinancialCalculator : FinancialCalculator {
         tax: Double
     ): Double {
         return when (type) {
-            TransactionType.BUY -> subtotal + fee
-            TransactionType.SELL -> subtotal - fee - tax
-            TransactionType.DIVIDEND -> maxOf(0.0, subtotal - fee)
-            TransactionType.STOCK_DIVIDEND -> 0.0
-            TransactionType.DEPOSIT -> subtotal
-            TransactionType.WITHDRAW -> subtotal
-            TransactionType.ADJUSTMENT -> subtotal
-            TransactionType.CAPITAL_REDUCTION -> maxOf(0.0, subtotal - fee) // 減資退還現金需扣除手續費
-            TransactionType.SPLIT -> 0.0 // 分割不涉及現金流
+            TransactionType.BUY -> subtotal + fee              // 買入：成交金額 + 手續費
+            TransactionType.SELL -> subtotal - fee - tax       // 賣出：成交金額 - 手續費 - 稅金
+            TransactionType.DIVIDEND -> maxOf(0.0, subtotal - fee) // 現金股利：股利 - 手續費（如有）
+            TransactionType.STOCK_DIVIDEND -> 0.0              // 股票股利：不涉及現金流
+            TransactionType.DEPOSIT -> subtotal                // 入金：直接計入金額
+            TransactionType.WITHDRAW -> subtotal               // 出金：直接計入金額
+            TransactionType.ADJUSTMENT -> subtotal             // 調整：直接計入金額
+            TransactionType.CAPITAL_REDUCTION -> maxOf(0.0, subtotal - fee) // 減資退現：退款 - 手續費
+            TransactionType.SPLIT -> 0.0                       // 分割：不涉及現金流
         }
     }
 
