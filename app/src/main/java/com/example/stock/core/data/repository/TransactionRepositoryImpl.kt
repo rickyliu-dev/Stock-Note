@@ -2,6 +2,7 @@ package com.example.stock.core.data.repository
 
 import com.example.stock.core.data.dataClass.StockQuote
 import com.example.stock.core.data.model.Account
+import com.example.stock.core.data.model.StockDetail
 import com.example.stock.core.data.model.StockPriceEntity
 import com.example.stock.core.data.model.TransactionDao
 import com.example.stock.core.data.model.TransactionItem
@@ -134,5 +135,9 @@ class TransactionRepositoryImpl @Inject constructor(
         }
         transactionDao.upsertTransactions(entities)
         return newAccountId
+    }
+
+    override suspend fun fetchStockDetail(symbol: String): StockDetail? {
+        return stockFetcher.fetchStockDetail(symbol)
     }
 }

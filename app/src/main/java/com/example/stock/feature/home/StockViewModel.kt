@@ -26,7 +26,6 @@ import javax.inject.Inject
 class StockViewModel @Inject constructor(
     private val repository: TransactionRepository,
     private val settingsRepository: SettingsRepository,
-    private val stockFetcher: StockFetcher,
     private val getStockInventoryUseCase: GetStockInventoryUseCase,
     private val importExcelUseCase: com.example.stock.core.domain.ImportExcelUseCase
 ) : ViewModel() {
@@ -247,7 +246,7 @@ class StockViewModel @Inject constructor(
                 
                 val newQuotes = _stockQuotes.value.toMutableMap()
                 symbols.forEach { symbol ->
-                    stockFetcher.fetchStockDetail(symbol)?.let {
+                    repository.fetchStockDetail(symbol)?.let {
                         newQuotes[symbol] = StockQuote(it.currentPrice, it.change, it.changePercent)
                     }
                     delay(500)

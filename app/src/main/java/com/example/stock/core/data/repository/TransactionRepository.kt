@@ -2,6 +2,7 @@ package com.example.stock.core.data.repository
 
 import com.example.stock.core.data.dataClass.StockQuote
 import com.example.stock.core.data.model.Account
+import com.example.stock.core.data.model.StockDetail
 import com.example.stock.core.data.model.TransactionItem
 import com.example.stock.core.data.source.SearchRegion
 import kotlinx.coroutines.flow.Flow
@@ -25,4 +26,5 @@ interface TransactionRepository {
     fun getAccountFlowById(id: Long): Flow<Account?>
     suspend fun getAccountById(id: Long): Account?
     suspend fun importTransactionsToNewAccount(accountName: String, items: List<TransactionItem>): Long
+    suspend fun fetchStockDetail(symbol: String): StockDetail?
 }
