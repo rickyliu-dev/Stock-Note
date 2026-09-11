@@ -3,6 +3,7 @@ package com.example.stock.core.domain
 import com.example.stock.core.data.FinancialCalculator
 import com.example.stock.core.data.model.TransactionType
 import javax.inject.Inject
+import kotlin.math.floor
 
 /**
  * 封裝交易計算邏輯的 UseCase
@@ -31,7 +32,7 @@ class CalculateTransactionUseCase @Inject constructor(
     )
 
     operator fun invoke(params: Params): Result {
-        val subtotal = params.price * params.shares
+        val subtotal = floor(params.price * params.shares)
         
         // 1. 計算手續費 (優先使用手動輸入，若無則自動計算)
         // 注意：股息(DIVIDEND)不需要計算交易手續費，僅扣除匯費 (通常也是由使用者手動輸入 customFee)
