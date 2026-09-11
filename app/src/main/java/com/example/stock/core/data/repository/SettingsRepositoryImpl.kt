@@ -60,13 +60,6 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
-    data class TwSettings(
-        val feeRate: String = MarketConstants.Taiwan.DEFAULT_FEE_RATE,
-        val discount: String = MarketConstants.Taiwan.DISCOUNT,
-        val minFee: String = MarketConstants.Taiwan.DEFAULT_MIN_FEE,
-        val showPreDeduct: Boolean = false
-    )
-
     override val isPremiumUnlockedFlow: Flow<Boolean> = dataStore.data.map { preferences ->
         preferences[IS_PREMIUM_UNLOCKED] ?: false
     }
@@ -78,9 +71,9 @@ class SettingsRepositoryImpl @Inject constructor(
     }
 
     // 2. 讀取設定 (以 Flow 形式回傳，當資料改變時 UI 會自動收到通知)
-    override val twSettingsFlow: Flow<TwSettings> = context.dataStore.data
+    override val twSettingsFlow: Flow<SettingsRepository.TwSettings> = context.dataStore.data
         .map { preferences ->
-            TwSettings(
+            SettingsRepository.TwSettings(
                 preferences[TW_FEE_RATE] ?: MarketConstants.Taiwan.DEFAULT_FEE_RATE,
                 preferences[TW_DISCOUNT] ?: MarketConstants.Taiwan.DISCOUNT,
                 preferences[TW_MIN_FEE] ?: MarketConstants.Taiwan.DEFAULT_MIN_FEE,

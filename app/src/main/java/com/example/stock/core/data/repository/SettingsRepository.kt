@@ -22,7 +22,7 @@ interface SettingsRepository {
     val isPremiumUnlockedFlow: Flow<Boolean>
     suspend fun unlockPremium()
 
-    val twSettingsFlow: Flow<SettingsRepositoryImpl.TwSettings>
+    val twSettingsFlow: Flow<TwSettings>
     suspend fun saveTwSettings(feeRate: String, discount: String, minFee: String, enabled: Boolean)
 
     val dashboardSettingsFlow: Flow<List<DashboardSettingItem>?>
