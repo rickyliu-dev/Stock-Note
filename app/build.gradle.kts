@@ -60,29 +60,31 @@ android {
 
     buildTypes {
         getByName("debug") {
-            // 直接指定，不要用 if 判斷。
-            // 如果檔案不存在，編譯時會報 "File not found" 的錯誤，這才是我們要的。
             signingConfig = signingConfigs.getByName("sharedDebug")
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            resValue("string", "app_name", "Stock (Debug)")
         }
         getByName("release") {
             // 指定使用上面定義的 release 金鑰
             signingConfig = signingConfigs.getByName("release")
 
-            isMinifyEnabled = false // 若要正式上架建議改為 true
+            isMinifyEnabled = false // 要正式上架則改為 true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
 
-            // 新增：Firebase App Distribution 配置
+            // Firebase App Distribution 配置
             firebaseAppDistribution {
                 artifactType = "APK"
                 groups = "alpha-testers"
                 releaseNotes = "第二版 Release 測試"
 
-                // 關鍵：讓 Gradle 直接讀取這份憑證，跳過所有登入步驟
+                // 讓 Gradle 直接讀取這份憑證，跳過所有登入步驟
                 serviceCredentialsFile = rootProject.file("app/credentials.json").absolutePath
             }
+            resValue("string", "app_name", "Stock")
         }
     }
     compileOptions {

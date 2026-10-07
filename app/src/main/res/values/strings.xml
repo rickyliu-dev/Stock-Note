@@ -1,5 +1,4 @@
 <resources>
-    <string name="app_name">Stock</string>
     <string name="portfolio_active">持有中 (%1$d)</string>
     <string name="portfolio_closed">已清倉 (%1$d)</string>
     <string name="search_placeholder">搜尋股票代碼或名稱</string>
