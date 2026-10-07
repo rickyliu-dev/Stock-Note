@@ -2,13 +2,10 @@ package com.example.stock.core.data.repository
 
 import com.example.stock.core.data.dataClass.StockQuote
 import com.example.stock.core.data.model.Account
-import com.example.stock.core.data.model.StockDetail
 import com.example.stock.core.data.model.StockPriceEntity
 import com.example.stock.core.data.model.TransactionDao
 import com.example.stock.core.data.model.TransactionItem
 import com.example.stock.core.data.model.TransactionMapper
-import com.example.stock.core.data.source.SearchRegion
-import com.example.stock.core.data.source.StockFetcher
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -19,7 +16,6 @@ import javax.inject.Singleton
 
 @Singleton
 class TransactionRepositoryImpl @Inject constructor(
-    private val stockFetcher: StockFetcher,
     private val transactionDao: TransactionDao
 ) : TransactionRepository {
     // 取得所有帳戶
@@ -84,16 +80,6 @@ class TransactionRepositoryImpl @Inject constructor(
         transactionDao.insertStockPrices(entities)
     }
 
-    override suspend fun preloadData() {
-        stockFetcher.preloadTwStocks()
-    }
-
-    override suspend fun searchStocks(query: String, region: SearchRegion): List<Pair<String, String>> {
-        if (query.isBlank()) return emptyList()
-
-        return stockFetcher.searchStocks(query, region)
-    }
-
     override suspend fun deleteTransactionById(id: Long) {
         transactionDao.deleteById(id)
     }
@@ -135,9 +121,5 @@ class TransactionRepositoryImpl @Inject constructor(
         }
         transactionDao.upsertTransactions(entities)
         return newAccountId
-    }
-
-    override suspend fun fetchStockDetail(symbol: String): StockDetail? {
-        return stockFetcher.fetchStockDetail(symbol)
     }
 }

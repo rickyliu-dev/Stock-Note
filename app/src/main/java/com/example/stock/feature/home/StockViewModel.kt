@@ -11,7 +11,7 @@ import com.example.stock.core.data.model.CostBasisMethod
 import com.example.stock.core.data.model.TransactionItem
 import com.example.stock.core.data.repository.SettingsRepository
 import com.example.stock.core.data.repository.TransactionRepository
-import com.example.stock.core.data.source.StockFetcher
+import com.example.stock.core.data.repository.StockRepository
 import com.example.stock.core.domain.GetStockInventoryUseCase
 import com.example.stock.feature.home.component.PortfolioSummary
 import com.example.stock.feature.home.component.StockDisplayItem
@@ -26,6 +26,7 @@ import javax.inject.Inject
 class StockViewModel @Inject constructor(
     private val repository: TransactionRepository,
     private val settingsRepository: SettingsRepository,
+    private val stockRepository: StockRepository,
     private val getStockInventoryUseCase: GetStockInventoryUseCase,
     private val importExcelUseCase: com.example.stock.core.domain.ImportExcelUseCase
 ) : ViewModel() {
@@ -235,7 +236,7 @@ class StockViewModel @Inject constructor(
 
     fun selectTab(index: Int) { _selectedTabIndex.value = index }
     fun updateSearchQuery(query: String) { _searchQuery.value = query }
-    
+
     fun updateAllPrices() {
         if (isUpdating.value) return
         isUpdating.value = true
@@ -243,10 +244,10 @@ class StockViewModel @Inject constructor(
             try {
                 val symbols = _uiState.value.activeList.map { it.symbol }.distinct()
                 if (symbols.isEmpty()) return@launch
-                
+
                 val newQuotes = _stockQuotes.value.toMutableMap()
                 symbols.forEach { symbol ->
-                    repository.fetchStockDetail(symbol)?.let {
+                    stockRepository.fetchStockDetail(symbol)?.let {
                         newQuotes[symbol] = StockQuote(it.currentPrice, it.change, it.changePercent)
                     }
                     delay(500)

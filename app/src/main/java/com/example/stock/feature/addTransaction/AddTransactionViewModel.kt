@@ -16,6 +16,7 @@ import com.example.stock.core.data.model.TransactionItem
 import com.example.stock.core.data.model.TransactionType
 import com.example.stock.core.data.repository.SettingsRepository
 import com.example.stock.core.data.repository.TransactionRepository
+import com.example.stock.core.data.repository.StockRepository
 import com.example.stock.core.domain.CalculateTransactionUseCase
 import com.example.stock.navigation.AllScreens
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -60,6 +61,7 @@ data class AddTransactionUiState(
 class AddTransactionViewModel @Inject constructor(
     private val repository: TransactionRepository,
     private val settingsRepository: SettingsRepository,
+    private val stockRepository: StockRepository,
     private val calculateTransactionUseCase: CalculateTransactionUseCase,
     private val dateProvider: DateProvider,
     savedStateHandle: SavedStateHandle
@@ -174,14 +176,14 @@ class AddTransactionViewModel @Inject constructor(
                 return@launch
             }
             delay(EnterConstants.DEBOUNCE_DELAY)
-            val results = repository.searchStocks(newSymbol)
+            val results = stockRepository.searchStocks(newSymbol)
             uiState = uiState.copy(searchResults = results)
         }
     }
 
     private fun fetchNameForSymbol(query: String) {
         viewModelScope.launch {
-            val results = repository.searchStocks(query)
+            val results = stockRepository.searchStocks(query)
             val match = results.find { it.first == query } ?: results.firstOrNull()
             if (match != null) {
                 uiState = uiState.copy(name = match.second)
