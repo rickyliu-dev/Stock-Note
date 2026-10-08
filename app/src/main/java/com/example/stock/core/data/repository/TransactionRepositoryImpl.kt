@@ -6,7 +6,8 @@ import com.example.stock.core.data.model.StockPriceEntity
 import com.example.stock.core.data.model.TransactionDao
 import com.example.stock.core.data.model.TransactionItem
 import com.example.stock.core.data.model.TransactionMapper
-import kotlinx.coroutines.MainScope
+import com.example.stock.di.ApplicationScope
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -16,24 +17,21 @@ import javax.inject.Singleton
 
 @Singleton
 class TransactionRepositoryImpl @Inject constructor(
-    private val transactionDao: TransactionDao
+    private val transactionDao: TransactionDao,
+    @ApplicationScope private val appScope: CoroutineScope
 ) : TransactionRepository {
     // 取得所有帳戶
     override val allAccounts: Flow<List<Account>> = transactionDao.getAllAccounts()
 
     init {
-        // 初始化檢查：如果沒有帳戶，建立一個預設帳戶
-        MainScope().launch(kotlinx.coroutines.Dispatchers.IO) {
-            val accounts = transactionDao.getAllAccounts().first()
-            if (accounts.isEmpty()) {
-                transactionDao.upsertAccount(
-                    Account(
-                        id = 1L,
-                        name = "預設帳戶",
-                        currency = "TWD"
-                    )
-                )
-            }
+        appScope.launch { ensureDefaultAccount() }
+    }
+
+    private suspend fun ensureDefaultAccount() {
+        if (transactionDao.getAllAccounts().first().isEmpty()) {
+            transactionDao.upsertAccount(
+                Account(id = 1L, name = "預設帳戶", currency = "TWD")
+            )
         }
     }
 
