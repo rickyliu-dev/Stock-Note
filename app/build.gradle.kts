@@ -47,8 +47,8 @@ android {
         applicationId = "com.example.stock"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 3
+        versionName = "0.1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -79,7 +79,7 @@ android {
             firebaseAppDistribution {
                 artifactType = "APK"
                 groups = "alpha-testers"
-                releaseNotes = "第二版 Release 測試"
+                releaseNotes = "第三版 Release 測試"
 
                 // 讓 Gradle 直接讀取這份憑證，跳過所有登入步驟
                 serviceCredentialsFile = rootProject.file("app/credentials.json").absolutePath
