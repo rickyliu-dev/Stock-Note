@@ -41,41 +41,8 @@ class YahooRemoteDataSource @Inject constructor(private val client: OkHttpClient
             val url = "https://query1.finance.yahoo.com/v8/finance/chart/$yahooSymbol?interval=1d&range=2d"
             val request = Request.Builder().url(url).header("User-Agent", userAgent).build()
             val response = client.newCall(request).execute()
-            if (response.isSuccessful) response.body?.string()?.let { parseQuoteFromJson(it) } else null
+            if (response.isSuccessful) response.body?.string()?.let { YahooQuoteParser.parse(it) } else null
         } catch (e: Exception) {
-            null
-        }
-    }
-
-    private fun parseQuoteFromJson(jsonStr: String): StockDetail? {
-        return try {
-            val resultObj = JSONObject(jsonStr).getJSONObject("chart").getJSONArray("result").getJSONObject(0)
-            val meta = resultObj.getJSONObject("meta")
-            val currentPrice = meta.getDouble("regularMarketPrice")
-
-            var previousClose = when {
-                meta.has("regularMarketPreviousClose") -> meta.getDouble("regularMarketPreviousClose")
-                meta.has("chartPreviousClose") -> meta.getDouble("chartPreviousClose")
-                else -> 0.0
-            }
-
-            if (previousClose <= 0) {
-                try {
-                    val closeArray = resultObj.getJSONObject("indicators").getJSONArray("quote").getJSONObject(0).getJSONArray("close")
-                    for (i in 0 until closeArray.length()) {
-                        val v = closeArray.optDouble(i, 0.0)
-                        if (v > 0) { previousClose = v; break }
-                    }
-                } catch (e: Exception) { /* ignore */ }
-            }
-            if (previousClose <= 0) previousClose = currentPrice
-
-            val change = currentPrice - previousClose
-            val changePercent = if (previousClose > 0) (change / previousClose) * 100 else 0.0
-
-            StockDetail(currentPrice = currentPrice, change = change, changePercent = changePercent)
-        } catch (e: Exception) {
-            e.printStackTrace()
             null
         }
     }
