@@ -47,7 +47,7 @@ class GoogleDriveManager @Inject constructor(
     suspend fun signOut(): Boolean = withContext(Dispatchers.IO) {
         try {
             googleSignInClient.signOut()
-            // 同時清除快取中的認證資訊 (如果有需要)
+            // 同時清除快取中的認證資訊
             android.util.Log.d("GoogleDriveManager", "Google 帳號已成功登出")
             true
         } catch (e: Exception) {

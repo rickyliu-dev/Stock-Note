@@ -6,17 +6,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.stock.core.api.GoogleSheetApi
 import com.example.stock.core.data.EnterConstants
 import com.example.stock.core.data.MarketConstants
-import com.example.stock.core.data.dataClass.StockItem
 import com.example.stock.core.data.enumClass.DashboardIds
-import com.example.stock.core.data.model.CostBasisMethod
 import com.example.stock.core.data.model.DashboardSettingItem
 import com.example.stock.core.data.model.TransactionItem
 import com.example.stock.core.data.repository.SettingsRepository
 import com.example.stock.core.data.repository.TransactionRepository
-import com.example.stock.core.domain.GetStockInventoryUseCase
 import com.example.stock.core.util.CsvManager
 import com.example.stock.core.util.GoogleDriveManager
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
@@ -38,13 +34,10 @@ class SettingsViewModel @Inject constructor(
     private val repository: SettingsRepository,
     private val transactionRepository: TransactionRepository,
     private val googleDriveManager: GoogleDriveManager,
-    private val getStockInventoryUseCase: GetStockInventoryUseCase,
     private val importExcelUseCase: com.example.stock.core.domain.ImportExcelUseCase,
     private val importCsvUseCase: com.example.stock.core.domain.ImportCsvUseCase
 ) : ViewModel() {
     private var saveJob: Job? = null
-
-    private val api = GoogleSheetApi()
 
     // 畫面的狀態
     var feeRate by mutableStateOf(MarketConstants.Taiwan.DEFAULT_FEE_RATE)
@@ -306,47 +299,7 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    // --- 修改原本的 importCsvData (改為由 executeCsvImport 處理) ---
-    // (可以移除舊的 importCsvData)
-
     suspend fun getAllTransactionsForExport(): List<TransactionItem> {
         return transactionRepository.transactionsDesc.first()
-    }
-
-    fun backupDataToCloud(onResult: (Boolean) -> Unit) {
-        viewModelScope.launch {
-            _isBackupLoading.value = true
-            try {
-                // 1. 取得所有交易紀錄
-                val allTransactions = transactionRepository.transactionsDesc.first()
-                
-                // 2. 透過 UseCase 計算庫存
-                val result = getStockInventoryUseCase(
-                    allTransactions = allTransactions,
-                    method = CostBasisMethod.AVERAGE_COST,
-                    includeDividends = true
-                )
-
-                // 3. 轉成 StockItem 格式 (只備份庫存不為 0 的)
-                val stockItems = result.positions.filter { it.value.shares > 0 }.map { (symbol, position) ->
-                    val name = position.name
-                    StockItem(
-                        symbol = symbol,
-                        name = name,
-                        cost = position.totalCost,
-                        shares = position.shares
-                    )
-                }
-
-                // 4. 上傳雲端
-                val isSuccess = api.backupAllToCloud(stockItems)
-                onResult(isSuccess)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                onResult(false)
-            } finally {
-                _isBackupLoading.value = false
-            }
-        }
     }
 }
