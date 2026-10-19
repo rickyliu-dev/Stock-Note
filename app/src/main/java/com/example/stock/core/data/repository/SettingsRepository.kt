@@ -2,7 +2,7 @@ package com.example.stock.core.data.repository
 
 import com.example.stock.core.data.MarketConstants
 import com.example.stock.core.data.model.CostBasisMethod
-import com.example.stock.feature.setting.DashboardSettingItem
+import com.example.stock.core.data.model.DashboardSettingItem
 import kotlinx.coroutines.flow.Flow
 
 interface SettingsRepository {

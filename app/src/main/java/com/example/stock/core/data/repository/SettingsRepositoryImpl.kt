@@ -10,7 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.stock.core.data.MarketConstants
 import com.example.stock.core.data.model.CostBasisMethod
-import com.example.stock.feature.setting.DashboardSettingItem
+import com.example.stock.core.data.model.DashboardSettingItem
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map

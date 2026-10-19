@@ -5,9 +5,7 @@ import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.CurrencyBitcoin
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.example.stock.core.data.enumClass.DashboardIds
 import com.example.stock.navigation.AllScreens
-import kotlinx.serialization.Serializable
 
 sealed class SettingCategory(
     val title: String,
@@ -48,9 +46,3 @@ data class SubSetting(
     val route: String
 )
 
-@Serializable
-data class DashboardSettingItem(
-    val id: DashboardIds,
-    val title: String,
-    val isVisible: Boolean = true
-)

@@ -20,7 +20,7 @@ import com.example.stock.core.ui.theme.ProfitColor
 import com.example.stock.feature.detail.component.FormattedValue
 import com.example.stock.feature.detail.component.ProfitDisplay
 import com.example.stock.feature.detail.component.StockSummary
-import com.example.stock.feature.setting.DashboardSettingItem
+import com.example.stock.core.data.model.DashboardSettingItem
 import com.example.stock.navigation.AllScreens
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*

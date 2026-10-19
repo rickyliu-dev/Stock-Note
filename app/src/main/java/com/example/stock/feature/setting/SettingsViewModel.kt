@@ -12,6 +12,7 @@ import com.example.stock.core.data.MarketConstants
 import com.example.stock.core.data.dataClass.StockItem
 import com.example.stock.core.data.enumClass.DashboardIds
 import com.example.stock.core.data.model.CostBasisMethod
+import com.example.stock.core.data.model.DashboardSettingItem
 import com.example.stock.core.data.model.TransactionItem
 import com.example.stock.core.data.repository.SettingsRepository
 import com.example.stock.core.data.repository.TransactionRepository
