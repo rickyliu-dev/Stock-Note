@@ -1,7 +1,5 @@
 package com.example.stock.core.domain
 
-import android.content.Context
-import android.net.Uri
 import android.util.Log
 import com.example.stock.core.data.model.TransactionItem
 import com.example.stock.core.data.model.TransactionType
@@ -20,12 +18,12 @@ import javax.inject.Inject
  */
 class ImportExcelUseCase @Inject constructor() {
 
-    fun execute(context: Context, uri: Uri): List<TransactionItem> {
+    fun execute(input: InputStream): List<TransactionItem> {
         val transactions = mutableListOf<TransactionItem>()
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
         try {
-            context.contentResolver.openInputStream(uri)?.use { stream ->
+            input.use { stream ->
                 val workbook = XSSFWorkbook(stream)
                 val sheet = workbook.getSheetAt(0)
                 val rowIterator = sheet.iterator()

@@ -209,7 +209,7 @@ class SettingsViewModel @Inject constructor(
     fun importExcel(context: android.content.Context, uri: Uri, onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val importedItems = importExcelUseCase.execute(context, uri)
+                val importedItems = context.contentResolver.openInputStream(uri)?.let { importExcelUseCase.execute(it) } ?: emptyList()
                 if (importedItems.isNotEmpty()) {
                     transactionRepository.upsertTransactions(importedItems)
                     withContext(Dispatchers.Main) {
@@ -231,7 +231,7 @@ class SettingsViewModel @Inject constructor(
     fun importStandardCsv(context: android.content.Context, uri: Uri, onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val importedItems = importCsvUseCase.execute(context, uri)
+                val importedItems = context.contentResolver.openInputStream(uri)?.let { importCsvUseCase.execute(it) } ?: emptyList()
                 if (importedItems.isNotEmpty()) {
                     transactionRepository.upsertTransactions(importedItems)
                     withContext(Dispatchers.Main) {

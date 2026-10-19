@@ -34,7 +34,7 @@ class StockViewModel @Inject constructor(
     fun importFromExcel(context: android.content.Context, uri: android.net.Uri) {
         viewModelScope.launch {
             try {
-                val items = importExcelUseCase.execute(context, uri)
+                val items = context.contentResolver.openInputStream(uri)?.let { importExcelUseCase.execute(it) } ?: emptyList()
                 if (items.isNotEmpty()) {
                     val timestamp = System.currentTimeMillis()
                     val accountName = "匯入帳戶_$timestamp"
