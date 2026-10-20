@@ -3,7 +3,10 @@ package com.example.stock.core.data.repository
 import com.example.stock.core.data.dataClass.StockQuote
 import com.example.stock.core.data.model.Account
 import com.example.stock.core.data.model.StockPriceEntity
+import com.example.stock.core.data.model.Transaction
 import com.example.stock.core.data.model.TransactionDao
+import com.example.stock.core.data.model.TransactionItem
+import com.example.stock.core.data.model.TransactionType
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -16,7 +19,9 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.LocalDate
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -109,5 +114,48 @@ class TransactionRepositoryImplTest {
 
         assertEquals(5L, id)
         coVerify { dao.insertAccount(match { it.name == "匯入帳戶" && it.currency == "TWD" }) }
+    }
+
+    // ---------- 匯入到新帳戶 ----------
+
+    private fun sampleItem(accountId: Long, symbol: String) = TransactionItem(
+        id = 0L,
+        accountId = accountId,
+        type = TransactionType.BUY,
+        symbol = symbol,
+        name = "測試",
+        price = 100.0,
+        shares = 1000,
+        date = LocalDate(2026, 1, 2),
+        fee = 0.0,
+        tax = 0.0,
+        note = "",
+        dividend = 0.0,
+        total = 100000.0,
+        participatingShares = 0
+    )
+
+    @Test
+    fun `匯入時用傳入名稱建立新帳戶，每筆交易都改指派到新帳戶 id`() = runTest {
+        val newId = 42L
+        val accountSlot = slot<Account>()
+        coEvery { dao.insertAccount(capture(accountSlot)) } returns newId
+
+        val items = listOf(
+            sampleItem(accountId = 1L, symbol = "2330"),
+            sampleItem(accountId = 5L, symbol = "AAPL")
+        )
+
+        val result = createRepo().importTransactionsToNewAccount("匯入帳戶", items)
+
+        assertEquals(newId, result)
+        assertEquals("匯入帳戶", accountSlot.captured.name)
+        assertEquals("TWD", accountSlot.captured.currency)
+
+        val savedSlot = slot<List<Transaction>>()
+        coVerify(exactly = 1) { dao.upsertTransactions(capture(savedSlot)) }
+        assertEquals(2, savedSlot.captured.size)
+        assertTrue(savedSlot.captured.all { it.accountId == newId })
+        assertEquals(listOf("2330", "AAPL"), savedSlot.captured.map { it.symbol })
     }
 }
