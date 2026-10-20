@@ -420,28 +420,6 @@ fun SettingsMainScreen(
                     ) {
                         Text("🛠️ (開發者專用) 產生一組新序號")
                     }
-
-                    // --- 👇 這是新增的「一鍵備份」按鈕 👇 ---
-                    Button(
-                        onClick = {
-                            Toast.makeText(context, "⏳ 讀取真實資料並同步至雲端...", Toast.LENGTH_SHORT).show()
-
-                            // 呼叫 ViewModel 的真實備份功能
-                            viewModel.backupDataToCloud { isSuccess ->
-                                // 這個區塊會在備份結束後執行
-                                if (isSuccess) {
-                                    Toast.makeText(context, "🎉 真實資料備份大成功！", Toast.LENGTH_SHORT).show()
-                                    println("✅ 雲端備份成功")
-                                } else {
-                                    Toast.makeText(context, "😢 備份失敗，請檢查網路狀態", Toast.LENGTH_SHORT).show()
-                                    println("❌ 雲端備份失敗")
-                                }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-                    ) {
-                        Text("☁️ (開發者專用) 真實資料一鍵備份")
-                    }
                 }
             }
         }

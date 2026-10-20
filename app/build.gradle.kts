@@ -27,8 +27,6 @@ android {
     // 2. 設定簽名配置
     signingConfigs {
         create("sharedDebug") {
-            // 建議直接用相對路徑，確保公司與家裡路徑一致
-            // 假設你的檔案在 專案根目錄/keystores/debug.keystore
             storeFile = rootProject.file("keystore/debug.keystore")
             storePassword = "android"
             keyAlias = "androiddebugkey"
@@ -47,8 +45,8 @@ android {
         applicationId = "com.example.stock"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 3
+        versionName = "0.1.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -60,29 +58,31 @@ android {
 
     buildTypes {
         getByName("debug") {
-            // 直接指定，不要用 if 判斷。
-            // 如果檔案不存在，編譯時會報 "File not found" 的錯誤，這才是我們要的。
             signingConfig = signingConfigs.getByName("sharedDebug")
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            resValue("string", "app_name", "Stock (Debug)")
         }
         getByName("release") {
             // 指定使用上面定義的 release 金鑰
             signingConfig = signingConfigs.getByName("release")
 
-            isMinifyEnabled = false // 若要正式上架建議改為 true
+            isMinifyEnabled = false // 要正式上架則改為 true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
 
-            // 新增：Firebase App Distribution 配置
+            // Firebase App Distribution 配置
             firebaseAppDistribution {
                 artifactType = "APK"
                 groups = "alpha-testers"
-                releaseNotes = "第二版 Release 測試"
+                releaseNotes = "第三版 Release 測試"
 
-                // 關鍵：讓 Gradle 直接讀取這份憑證，跳過所有登入步驟
+                // 讓 Gradle 直接讀取這份憑證，跳過所有登入步驟
                 serviceCredentialsFile = rootProject.file("app/credentials.json").absolutePath
             }
+            resValue("string", "app_name", "Stock")
         }
     }
     compileOptions {
@@ -130,6 +130,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.material3)
+    testImplementation(libs.junit.junit)
 
     // --- Compose BOM & UI ---
     val composeBom = platform(libs.androidx.compose.bom)
@@ -172,6 +173,10 @@ dependencies {
 
     // --- Testing ---
     testImplementation(libs.junit)
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.org.json)
+    androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

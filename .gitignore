@@ -18,3 +18,5 @@ local.properties
 # 排除所有金鑰檔案
 *.keystore
 *.jks
+
+app/credentials.json
