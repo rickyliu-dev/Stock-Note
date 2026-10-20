@@ -27,8 +27,6 @@ android {
     // 2. 設定簽名配置
     signingConfigs {
         create("sharedDebug") {
-            // 建議直接用相對路徑，確保公司與家裡路徑一致
-            // 假設你的檔案在 專案根目錄/keystores/debug.keystore
             storeFile = rootProject.file("keystore/debug.keystore")
             storePassword = "android"
             keyAlias = "androiddebugkey"
