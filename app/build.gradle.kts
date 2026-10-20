@@ -132,6 +132,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.material3)
+    testImplementation(libs.junit.junit)
 
     // --- Compose BOM & UI ---
     val composeBom = platform(libs.androidx.compose.bom)
