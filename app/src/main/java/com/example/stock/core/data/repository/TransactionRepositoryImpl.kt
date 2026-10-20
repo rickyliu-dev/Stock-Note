@@ -115,7 +115,7 @@ class TransactionRepositoryImpl @Inject constructor(
         )
 
         val entities = items.map {
-            TransactionMapper.toEntity(it)
+            TransactionMapper.toEntity(it.copy(accountId = newAccountId))
         }
         transactionDao.upsertTransactions(entities)
         return newAccountId
