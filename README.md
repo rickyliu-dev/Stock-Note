@@ -7,6 +7,7 @@
 - 手動記錄股票交易(買入/賣出)
 - 串接 Yahoo Finance API,提供股票/ETF 搜尋與非即時股價查詢,並處理台股代碼格式清理
 - 使用 Room 進行本地資料儲存
+- 資料庫修改規範請見 [docs/database-migrations.md](docs/database-migrations.md)。
 
 ## 技術棧
 

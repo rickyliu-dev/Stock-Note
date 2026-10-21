@@ -342,4 +342,31 @@ class GetStockInventoryUseCaseTest {
         assertClose(19540.0, p.unrealizedProfit)    // 119540 - 100000
         assertClose(5000.0, p.dailyProfit)          // 119540 - 114540
     }
+
+    @Test
+    fun `沒有報價時現價暫用平均成本，未實現與當日損益為 0`() {
+        val r = calculate(buy(1000, 100.0, fee = 100.0))   // 沒傳 quotes
+        val p = r.positions.getValue("2330")
+
+        assertClose(100.1, p.currentPrice)          // 退回平均成本
+        assertClose(100100.0, p.marketValue)
+        assertClose(0.0, p.unrealizedProfit)
+        assertClose(0.0, p.dailyProfit)
+        assertClose(0.0, r.portfolioUnrealizedProfit)
+    }
+
+    @Test
+    fun `報價為 0 視同沒有報價`() {
+        val quotes = mapOf("2330" to StockQuote(currentPrice = 0.0, change = 0.0, changePercent = 0.0))
+        val r = calculate(buy(1000, 100.0), quotes = quotes)
+
+        assertClose(0.0, r.positions.getValue("2330").unrealizedProfit)
+    }
+
+    @Test
+    fun `已清倉且沒有報價時現價為 0 而不是 NaN`() {
+        val r = calculate(buy(1000, 100.0), sell(1000, 110.0))
+
+        assertClose(0.0, r.positions.getValue("2330").currentPrice)
+    }
 }

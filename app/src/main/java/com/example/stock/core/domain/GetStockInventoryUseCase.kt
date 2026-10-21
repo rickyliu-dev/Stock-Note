@@ -40,8 +40,10 @@ class GetStockInventoryUseCase @Inject constructor(
 
         val positions = baseData.inventoryMap.mapValues { (symbol, data) ->
             val quote = quotes[symbol]
-            val currentPrice = quote?.currentPrice ?: 0.0
-            val change = quote?.change ?: 0.0
+            val quotedPrice = quote?.currentPrice?.takeIf { it > 0.0 }
+            val currentPrice = quotedPrice
+                ?: if (data.shares > 0) data.totalCost / data.shares else 0.0
+            val change = if (quotedPrice != null) quote?.change ?: 0.0 else 0.0
             val yesterdayPrice = currentPrice - change
             
             val shares = data.shares
