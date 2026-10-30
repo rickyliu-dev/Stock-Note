@@ -3,6 +3,7 @@ package com.example.stock.core.data.repository
 import com.example.stock.core.data.dataClass.StockQuote
 import com.example.stock.core.data.model.Account
 import com.example.stock.core.data.model.StockPriceEntity
+import com.example.stock.core.data.model.Transaction
 import com.example.stock.core.data.model.TransactionDao
 import com.example.stock.core.data.model.TransactionItem
 import com.example.stock.core.data.model.TransactionMapper
@@ -10,9 +11,11 @@ import com.example.stock.di.ApplicationScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -38,9 +41,20 @@ class TransactionRepositoryImpl @Inject constructor(
     }
 
     // 取得所有交易記錄，並透過 Mapper 轉為 UI Model
+    // 多個畫面共用同一份查詢結果；沒人訂閱 5 秒後停止，並清掉快取避免拿到舊資料
     override val transactionsDesc: Flow<List<TransactionItem>> = transactionDao.getAllTransactions()
-        .map { list -> list.map { TransactionMapper.toItem(it) } }
-        .flowOn(Dispatchers.Default)
+        .toItems()
+        .shareIn(appScope, SharingStarted.WhileSubscribed(5000, 0), replay = 1)
+
+    override fun transactionsByAccount(accountId: Long): Flow<List<TransactionItem>> =
+        transactionDao.getTransactionsByAccount(accountId).toItems()
+
+    override fun transactionsBySymbol(accountId: Long, symbol: String): Flow<List<TransactionItem>> =
+        transactionDao.getTransactionsBySymbol(accountId, symbol).toItems()
+
+    private fun Flow<List<Transaction>>.toItems(): Flow<List<TransactionItem>> =
+        map { list -> list.map { TransactionMapper.toItem(it) } }
+            .flowOn(Dispatchers.Default)
 
     override val stockPricesFlow: Flow<Map<String, StockQuote>> = transactionDao.getAllCachedPricesFlow()
         .map { entities ->

@@ -69,7 +69,11 @@ data class Account(
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("accountId")]
+    indices = [
+        Index("accountId"),
+        // 明細頁依 帳戶 + 股票代號 查詢，並依日期排序
+        Index(value = ["accountId", "symbol", "date"])
+    ]
 )
 data class Transaction(
     @PrimaryKey(autoGenerate = true)
@@ -151,6 +155,9 @@ interface TransactionDao {
     // --- 交易相關 ---
     @Query("SELECT * FROM transactions WHERE accountId = :accountId ORDER BY date DESC, id DESC")
     fun getTransactionsByAccount(accountId: Long): Flow<List<Transaction>>
+
+    @Query("SELECT * FROM transactions WHERE accountId = :accountId AND symbol = :symbol ORDER BY date DESC, id DESC")
+    fun getTransactionsBySymbol(accountId: Long, symbol: String): Flow<List<Transaction>>
 
     @Upsert
     suspend fun upsertTransactions(transactions: List<Transaction>)

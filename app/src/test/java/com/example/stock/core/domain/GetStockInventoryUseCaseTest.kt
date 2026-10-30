@@ -369,4 +369,34 @@ class GetStockInventoryUseCaseTest {
 
         assertClose(0.0, r.positions.getValue("2330").currentPrice)
     }
+
+    @Test
+    fun `同一天先買後賣，即使清單為新到舊也依新增順序計算`() {
+        val buy = tx(TransactionType.BUY, day = 29, price = 100.0, shares = 1000)
+        val sell = tx(TransactionType.SELL, day = 29, price = 110.0, shares = 1000)
+
+        // 資料庫回傳順序為 日期 DESC, id DESC，所以賣出排在買入前面
+        val result = useCase(listOf(sell, buy), settings = noPreDeduct)
+
+        val pos = result.positions.getValue("2330")
+        assertEquals(0.0, pos.shares, 0.0001)
+        assertEquals(10_000.0, pos.realizedProfit, 0.0001)
+    }
+
+    @Test
+    fun `分開計算庫存與套用股價的結果與一次計算相同`() {
+        val txs = listOf(
+            tx(TransactionType.BUY, day = 1, price = 100.0, shares = 1000),
+            tx(TransactionType.BUY, day = 2, price = 120.0, shares = 500),
+            tx(TransactionType.SELL, day = 3, price = 130.0, shares = 300),
+            tx(TransactionType.DIVIDEND, day = 4, total = 2_000.0)
+        )
+        val quotes = mapOf("2330" to StockQuote(currentPrice = 125.0, change = 5.0, changePercent = 4.17))
+
+        for (method in CostBasisMethod.entries) {
+            val combined = useCase(txs, quotes, noPreDeduct, method)
+            val split = useCase.evaluate(useCase.calculateBase(txs, method), quotes, noPreDeduct)
+            assertEquals(combined, split)
+        }
+    }
 }

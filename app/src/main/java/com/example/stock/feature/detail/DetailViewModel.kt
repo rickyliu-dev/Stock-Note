@@ -25,6 +25,7 @@ import com.example.stock.navigation.AllScreens
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -60,17 +61,16 @@ class DetailViewModel @Inject constructor(
     var selectedIds by mutableStateOf(emptySet<Long>())
         private set
 
-    // 所有的相關交易 (用於列表顯示)
-    val relatedTransactions = combine(
-        repository.transactionsDesc,
-        currentAccountId
-    ) { list, accountId ->
-        if (symbol == "CASH") {
-            list.filter { it.accountId == accountId }
-        } else {
-            list.filter { it.symbol == symbol && it.accountId == accountId }
+    // 所有的相關交易 (用於列表顯示)，直接由資料庫篩選帳戶與股票代號
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val relatedTransactions = settingsRepository.currentAccountIdFlow
+        .flatMapLatest { accountId ->
+            if (symbol == "CASH") {
+                repository.transactionsByAccount(accountId)
+            } else {
+                repository.transactionsBySymbol(accountId, symbol)
+            }
         }
-    }.flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // 核心數據流：調用統一的 UseCase

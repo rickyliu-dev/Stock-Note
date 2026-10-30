@@ -7,7 +7,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.stock.core.data.dataClass.StockQuote
 import com.example.stock.core.data.model.Account
-import com.example.stock.core.data.model.CostBasisMethod
 import com.example.stock.core.data.model.TransactionItem
 import com.example.stock.core.data.repository.SettingsRepository
 import com.example.stock.core.data.repository.TransactionRepository
@@ -17,6 +16,7 @@ import com.example.stock.feature.home.component.PortfolioSummary
 import com.example.stock.feature.home.component.StockDisplayItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -111,40 +111,49 @@ class StockViewModel @Inject constructor(
         startAutoUpdateCycle()
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     private fun setupDataStreams() {
-        combine(
-            settingsRepository.currentAccountIdFlow,
-            repository.transactionsDesc,
+        // 第一層：交易紀錄 → 庫存 (最耗時，只在交易、帳戶或成本計算方式改變時重算)
+        // 只向資料庫查詢目前帳戶的交易；切換帳戶時取消舊查詢
+        val baseInventoryFlow = settingsRepository.currentAccountIdFlow
+            .flatMapLatest { accId ->
+                combine(
+                    repository.transactionsByAccount(accId),
+                    settingsRepository.costBasisMethodFlow
+                ) { accountTx, method ->
+                    accId to getStockInventoryUseCase.calculateBase(
+                        allTransactions = accountTx,
+                        method = method
+                    )
+                }
+            }
+
+        // 第二層：套用股價與手續費設定 (股價更新時只重算這層)
+        val calcResultFlow = combine(
+            baseInventoryFlow,
             _stockQuotes,
-            settingsRepository.twSettingsFlow,
-            settingsRepository.costBasisMethodFlow,
+            settingsRepository.twSettingsFlow
+        ) { (accId, base), quotes, settings ->
+            accId to getStockInventoryUseCase.evaluate(base, quotes, settings)
+        }
+
+        // 第三層：顯示用的清單與總覽 (切換分頁、模式、搜尋時只重算這層)
+        combine(
+            calcResultFlow,
             settingsRepository.includeDividendsFlow,
             repository.allAccounts,
             _searchQuery,
             _selectedTabIndex,
             _isCumulative
         ) { args ->
-            val accId = args[0] as Long
-            val allTx = args[1] as List<TransactionItem>
-            val quotes = args[2] as Map<String, StockQuote>
-            val settings = args[3] as SettingsRepository.TwSettings
-            val method = args[4] as CostBasisMethod
-            val includeDiv = args[5] as Boolean
-            val accounts = args[6] as List<Account>
-            val query = args[7] as String
-            val tabIndex = args[8] as Int
-            val isCum = args[9] as Boolean
+            val (accId, calcResult) = args[0] as Pair<Long, GetStockInventoryUseCase.Result>
+            val includeDiv = args[1] as Boolean
+            val accounts = args[2] as List<Account>
+            val query = args[3] as String
+            val tabIndex = args[4] as Int
+            val isCum = args[5] as Boolean
 
-            val accountTx = allTx.filter { it.accountId == accId }
             val currentAccount = accounts.find { it.id == accId }
-            
-            val calcResult = getStockInventoryUseCase(
-                allTransactions = accountTx,
-                quotes = quotes,
-                settings = settings,
-                method = method,
-                includeDividends = includeDiv
-            )
 
             val fullStockList = calcResult.positions.values.map { pos ->
                 val currentProfit = if (tabIndex == 0) {

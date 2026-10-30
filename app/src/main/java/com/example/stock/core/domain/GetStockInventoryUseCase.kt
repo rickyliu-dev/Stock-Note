@@ -31,10 +31,25 @@ class GetStockInventoryUseCase @Inject constructor(
         settings: SettingsRepository.TwSettings = SettingsRepository.TwSettings(),
         method: CostBasisMethod = CostBasisMethod.AVERAGE_COST,
         includeDividends: Boolean = false
+    ): Result = evaluate(calculateBase(allTransactions, method), quotes, settings)
+
+    /**
+     * 1. 基礎庫存與已實現損益計算 (只依交易紀錄，與股價無關)
+     * 結果可快取，股價更新時直接重用，不必重算整份交易紀錄
+     */
+    fun calculateBase(
+        allTransactions: List<TransactionItem>,
+        method: CostBasisMethod = CostBasisMethod.AVERAGE_COST
+    ): BaseCalculation = calculateBaseInventory(allTransactions, method)
+
+    /**
+     * 2. 套用股價與設定，計算市值、未實現損益與今日損益
+     */
+    fun evaluate(
+        baseData: BaseCalculation,
+        quotes: Map<String, StockQuote> = emptyMap(),
+        settings: SettingsRepository.TwSettings = SettingsRepository.TwSettings()
     ): Result {
-        // 1. 基礎庫存與已實現損益計算
-        val baseData = calculateBaseInventory(allTransactions, method)
-        
         var portfolioUnrealized = 0.0
         var portfolioDaily = 0.0
 
@@ -126,14 +141,14 @@ class GetStockInventoryUseCase @Inject constructor(
         )
     }
 
-    private data class BaseCalculation(
+    data class BaseCalculation(
         val inventoryMap: Map<String, SymbolData>,
         val realizedProfit: Double,
         val totalCashDividend: Double,
         val totalCashFlow: Double
     )
 
-    private data class SymbolData(
+    data class SymbolData(
         val name: String,
         val shares: Double,
         val totalCost: Double,

@@ -1,11 +1,12 @@
 # 資料庫遷移規範
 
-目前資料庫版本：25（Room，schema 匯出在 `app/schemas/`）。
+目前資料庫版本：26（Room，schema 匯出在 `app/schemas/`）。
 
 ## 為什麼要有這份規範
 這個 App 記錄的是使用者的交易資料，升級時不能悄悄遺失。
-因此 release 版不使用 `fallbackToDestructiveMigration()`：找不到遷移規則時，
-寧可啟動失敗，也不清空資料。debug 版為了開發方便，保留清空重建。
+因此 debug 與 release 版都不使用 `fallbackToDestructiveMigration()`：找不到遷移規則時，
+寧可啟動失敗，也不清空資料。debug 版行為與 release 相同，遷移只需測一次；
+開發中若資料庫壞掉，請手動清除 App 資料或重新安裝。
 
 ## 每次修改資料表時
 1. 修改 Entity（新增、刪除欄位，或改型別）。
@@ -19,9 +20,10 @@
 ## 不要做的事
 - 不要修改已釋出版本的 schema JSON。
 - 不要在版本號不變的情況下改 Entity，現有資料庫的結構指紋（identityHash）會對不上。
-- 不要在 release 版加回 `fallbackToDestructiveMigration()`。
+- 不要加回 `fallbackToDestructiveMigration()`（debug 版也不要）。
 
 ## 版本紀錄
 | DB 版本 | 說明 |
 |---|---|
-| 25 | 目前基準版本 |
+| 25 | 基準版本 |
+| 26 | transactions 新增 (accountId, symbol, date) 索引（AutoMigration） |

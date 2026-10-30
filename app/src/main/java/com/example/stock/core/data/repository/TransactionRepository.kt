@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.Flow
 interface TransactionRepository {
     val allAccounts: Flow<List<Account>>
     val transactionsDesc: Flow<List<TransactionItem>>
+    fun transactionsByAccount(accountId: Long): Flow<List<TransactionItem>>
+    fun transactionsBySymbol(accountId: Long, symbol: String): Flow<List<TransactionItem>>
     val stockPricesFlow: Flow<Map<String, StockQuote>>
 
     suspend fun upsert(item: TransactionItem)

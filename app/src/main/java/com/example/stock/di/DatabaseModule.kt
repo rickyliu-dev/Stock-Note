@@ -6,7 +6,6 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
-import com.example.stock.BuildConfig
 import com.example.stock.core.data.model.TransactionDao
 import com.example.stock.dataBase.StockDatabase
 import dagger.Module
@@ -27,10 +26,6 @@ object DatabaseModule {
             StockDatabase::class.java,
             "stock_database"
         )
-            .apply {
-                // 只有測試版允許在找不到 Migration 時清空資料重建
-                if (BuildConfig.DEBUG) fallbackToDestructiveMigration()
-            }
             .build()
     }
 

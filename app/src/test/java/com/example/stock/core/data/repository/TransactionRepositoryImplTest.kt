@@ -158,4 +158,30 @@ class TransactionRepositoryImplTest {
         assertTrue(savedSlot.captured.all { it.accountId == newId })
         assertEquals(listOf("2330", "AAPL"), savedSlot.captured.map { it.symbol })
     }
+
+    // ---------- 依帳戶 / 股票代號查詢 ----------
+
+    @Test
+    fun `依股票代號查詢時只向資料庫查該帳戶該股票，並轉成 UI Model`() = runTest {
+        every { dao.getTransactionsBySymbol(2L, "2330") } returns flowOf(
+            listOf(Transaction(id = 5L, accountId = 2L, symbol = "2330", shares = 1000, date = "2026-10-29"))
+        )
+
+        val items = createRepo().transactionsBySymbol(2L, "2330").first()
+
+        assertEquals(1, items.size)
+        assertEquals(5L, items[0].id)
+        assertEquals(LocalDate(2026, 10, 29), items[0].date)
+    }
+
+    @Test
+    fun `依帳戶查詢時只向資料庫查該帳戶`() = runTest {
+        every { dao.getTransactionsByAccount(3L) } returns flowOf(
+            listOf(Transaction(id = 7L, accountId = 3L, date = "2026-10-01"))
+        )
+
+        val items = createRepo().transactionsByAccount(3L).first()
+
+        assertEquals(listOf(7L), items.map { it.id })
+    }
 }
