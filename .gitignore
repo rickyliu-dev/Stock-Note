@@ -14,7 +14,7 @@
 .cxx
 local.properties
 /keystore/debug.keystore
-/.kotlin/errors/errors-1770361458296.log
+/.kotlin/
 # 排除所有金鑰檔案
 *.keystore
 *.jks
