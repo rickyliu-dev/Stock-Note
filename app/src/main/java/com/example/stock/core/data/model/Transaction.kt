@@ -149,18 +149,18 @@ interface TransactionDao {
     fun getAccountFlowById(id: Long): Flow<Account?>
 
     // --- 交易相關 ---
-    @Query("SELECT * FROM transactions WHERE accountId = :accountId ORDER BY date DESC")
+    @Query("SELECT * FROM transactions WHERE accountId = :accountId ORDER BY date DESC, id DESC")
     fun getTransactionsByAccount(accountId: Long): Flow<List<Transaction>>
 
     @Upsert
     suspend fun upsertTransactions(transactions: List<Transaction>)
 
     // 給清單用的：最新日期在最上面
-    @Query("SELECT * FROM transactions ORDER BY date DESC")
+    @Query("SELECT * FROM transactions ORDER BY date DESC, id DESC")
     fun getAllTransactions(): Flow<List<Transaction>>
 
     // 給資產曲線計算用的：最早日期在最前面
-    @Query("SELECT * FROM transactions ORDER BY date ASC")
+    @Query("SELECT * FROM transactions ORDER BY date ASC, id ASC")
     fun getAllTransactionsAsc(): Flow<List<Transaction>>
 
     @Upsert

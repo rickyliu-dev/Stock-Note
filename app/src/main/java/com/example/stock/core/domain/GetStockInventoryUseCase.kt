@@ -155,7 +155,7 @@ class GetStockInventoryUseCase @Inject constructor(
         var totalRealizedProfit = 0.0
         var totalCashFlow = 0.0
 
-        val sortedTransactions = allTransactions.sortedBy { it.date }
+        val sortedTransactions = allTransactions.sortedWith(compareBy<TransactionItem> { it.date }.thenBy { it.id })
 
         for (trade in sortedTransactions) {
             val state = symbolDataMap.getOrPut(trade.symbol) { SymbolState(trade.name) }
