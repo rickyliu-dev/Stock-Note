@@ -432,14 +432,21 @@ fun HomeScreen(
                 }
             }
 
-            if (currentList.isEmpty() && selectedTabIndex == 1) {
+            val emptyMessage = when {
+                currentList.isNotEmpty() -> null
+                searchQuery.isNotBlank() -> "找不到符合「${searchQuery.trim()}」的股票"
+                selectedTabIndex == 1 -> "目前沒有已清倉的股票"
+                else -> null
+            }
+
+            if (emptyMessage != null) {
                 item {
                     Box(
                         modifier = Modifier.fillMaxWidth().padding(32.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "目前沒有已清倉的股票",
+                            text = emptyMessage,
                             color = Color.Gray
                         )
                     }

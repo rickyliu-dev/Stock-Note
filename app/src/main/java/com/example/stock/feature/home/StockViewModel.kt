@@ -63,9 +63,10 @@ class StockViewModel @Inject constructor(
     val portfolioSummary: StateFlow<PortfolioSummary> = uiState.map { it.summary }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PortfolioSummary())
         
-    val searchQuery: StateFlow<String> = uiState.map { it.searchQuery }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
-        
+    // 搜尋框直接綁定輸入值，不等背景計算完成，避免打字掉字或游標跳動
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
     val currentAccountId: StateFlow<Long> = uiState.map { it.currentAccountId }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1L)
         
@@ -102,8 +103,6 @@ class StockViewModel @Inject constructor(
     val selectedSymbols: Set<String> get() = _selectedSymbols.value
 
     private val _stockQuotes = MutableStateFlow<Map<String, StockQuote>>(emptyMap())
-    private val _searchQuery = MutableStateFlow("")
-    private val _selectedTabIndex = MutableStateFlow(0)
 
     init {
         setupDataStreams()
@@ -137,26 +136,21 @@ class StockViewModel @Inject constructor(
             accId to getStockInventoryUseCase.evaluate(base, quotes, settings)
         }
 
-        // 第三層：顯示用的清單與總覽 (切換分頁、模式、搜尋時只重算這層)
+        // 第三層：顯示用的清單與總覽 (切換模式、搜尋時只重算這層)
         combine(
             calcResultFlow,
             settingsRepository.includeDividendsFlow,
             repository.allAccounts,
             _searchQuery,
-            _selectedTabIndex,
             _isCumulative
-        ) { args ->
-            val (accId, calcResult) = args[0] as Pair<Long, GetStockInventoryUseCase.Result>
-            val includeDiv = args[1] as Boolean
-            val accounts = args[2] as List<Account>
-            val query = args[3] as String
-            val tabIndex = args[4] as Int
-            val isCum = args[5] as Boolean
-
+        ) { (accId, calcResult), includeDiv, accounts, rawQuery, isCum ->
+            val query = rawQuery.trim()
             val currentAccount = accounts.find { it.id == accId }
 
             val fullStockList = calcResult.positions.values.map { pos ->
-                val currentProfit = if (tabIndex == 0) {
+                // 持股中與已清倉各自用自己的損益公式 (與目前選中哪個分頁無關)
+                val isActive = pos.shares > 0
+                val currentProfit = if (isActive) {
                     // 持股中：基礎 (未實現 + 若累積則加已實現) + 若含息則加股息
                     val base = pos.unrealizedProfit + (if (isCum) pos.realizedProfit else 0.0)
                     if (includeDiv) base + pos.dividendAmount else base
@@ -175,7 +169,7 @@ class StockViewModel @Inject constructor(
                     avgCost = pos.avgCost,
                     profit = currentProfit,
                     profitPercent = when {
-                        tabIndex == 0 -> {
+                        isActive -> {
                             val denominator = if (isCum) {
                                 pos.totalBuyAmount
                             } else {
@@ -191,13 +185,12 @@ class StockViewModel @Inject constructor(
                 )
             }
 
-            val activeList = fullStockList.filter { it.shares > 0 }
-            val closedList = fullStockList.filter { it.shares <= 0 }
-            
-            val filteredList = if (tabIndex == 0) activeList else closedList
-            val finalDisplayList = filteredList.filter { 
-                it.symbol.contains(query, ignoreCase = true) || it.name.contains(query, ignoreCase = true) 
+            // 搜尋：代號或名稱包含關鍵字 (不分大小寫)，空白關鍵字則全部顯示
+            val matchedList = if (query.isEmpty()) fullStockList else fullStockList.filter {
+                it.symbol.contains(query, ignoreCase = true) || it.name.contains(query, ignoreCase = true)
             }
+            val activeList = matchedList.filter { it.shares > 0 }
+            val closedList = matchedList.filter { it.shares <= 0 }
 
             val initialBalance = currentAccount?.initialBalance ?: 0.0
             val cashEnabled = currentAccount?.isCashManagementEnabled ?: false
@@ -230,13 +223,10 @@ class StockViewModel @Inject constructor(
 
             HomeUiState(
                 summary = summary,
-                stockList = finalDisplayList,
                 activeList = activeList,
                 closedList = closedList,
                 isLoading = false,
-                selectedTabIndex = tabIndex,
-                currentAccountId = accId,
-                searchQuery = query
+                currentAccountId = accId
             )
         }.flowOn(Dispatchers.Default)
         .onEach { newState ->
@@ -244,7 +234,6 @@ class StockViewModel @Inject constructor(
         }.launchIn(viewModelScope)
     }
 
-    fun selectTab(index: Int) { _selectedTabIndex.value = index }
     fun updateSearchQuery(query: String) { _searchQuery.value = query }
 
     fun updateAllPrices() {
@@ -366,11 +355,8 @@ class StockViewModel @Inject constructor(
 
 data class HomeUiState(
     val summary: PortfolioSummary = PortfolioSummary(),
-    val stockList: List<StockDisplayItem> = emptyList(),
     val activeList: List<StockDisplayItem> = emptyList(),
     val closedList: List<StockDisplayItem> = emptyList(),
     val isLoading: Boolean = true,
-    val selectedTabIndex: Int = 0,
-    val currentAccountId: Long = 1L,
-    val searchQuery: String = ""
+    val currentAccountId: Long = 1L
 )

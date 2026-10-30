@@ -1,19 +1,5 @@
 package com.example.stock.feature.home.component
 
-
-
-data class HomeUiState(
-    val summary: PortfolioSummary = PortfolioSummary(),
-    val stockList: List<StockDisplayItem> = emptyList(),
-    val isLoading: Boolean = false,
-    val errorMessage: String? = null
-)
-
-data class StockInventory(
-    val shares: Double,
-    val totalCost: Double
-)
-
 data class StockDisplayItem(
     val symbol: String,
     val name: String,
