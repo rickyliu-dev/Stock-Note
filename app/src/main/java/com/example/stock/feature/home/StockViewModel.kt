@@ -229,7 +229,8 @@ class StockViewModel @Inject constructor(
                 currentAccountId = accId,
                 searchQuery = query
             )
-        }.onEach { newState ->
+        }.flowOn(Dispatchers.Default)
+        .onEach { newState ->
             _uiState.update { newState }
         }.launchIn(viewModelScope)
     }

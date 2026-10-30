@@ -48,7 +48,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.stock.feature.detail.component.MainProfitCard
 import com.example.stock.feature.detail.component.SummaryItemCard
-import com.example.stock.core.data.model.TransactionItem
 import com.example.stock.feature.detail.component.TransactionItemCard
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -175,11 +174,9 @@ fun HoldingsDetailScreen(
                 )
             }
 
-            val sortedList = transactions.sortedWith(
-                compareByDescending<TransactionItem> { it.date }.thenByDescending { it.id }
-            )
+            // 資料庫已依 日期 DESC, id DESC 排序，這裡不再重複排序
 
-            items(sortedList, key = { it.id }) { trans ->
+            items(transactions, key = { it.id }) { trans ->
                 val isSelected = viewModel.selectedIds.contains(trans.id)
 
                 Row(

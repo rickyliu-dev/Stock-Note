@@ -7,10 +7,12 @@ import com.example.stock.core.data.model.TransactionDao
 import com.example.stock.core.data.model.TransactionItem
 import com.example.stock.core.data.model.TransactionMapper
 import com.example.stock.di.ApplicationScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -38,6 +40,7 @@ class TransactionRepositoryImpl @Inject constructor(
     // 取得所有交易記錄，並透過 Mapper 轉為 UI Model
     override val transactionsDesc: Flow<List<TransactionItem>> = transactionDao.getAllTransactions()
         .map { list -> list.map { TransactionMapper.toItem(it) } }
+        .flowOn(Dispatchers.Default)
 
     override val stockPricesFlow: Flow<Map<String, StockQuote>> = transactionDao.getAllCachedPricesFlow()
         .map { entities ->

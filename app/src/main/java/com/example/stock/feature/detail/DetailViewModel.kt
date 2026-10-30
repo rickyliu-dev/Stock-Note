@@ -24,6 +24,7 @@ import com.example.stock.core.data.model.DashboardSettingItem
 import com.example.stock.navigation.AllScreens
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -69,7 +70,8 @@ class DetailViewModel @Inject constructor(
         } else {
             list.filter { it.symbol == symbol && it.accountId == accountId }
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // 核心數據流：調用統一的 UseCase
     private val positionState: StateFlow<StockPosition?> = combine(
@@ -106,7 +108,8 @@ class DetailViewModel @Inject constructor(
             val calcResult = getStockInventoryUseCase(transactions, quotes, settings, method, includeDiv)
             calcResult.positions[symbol]
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    }.flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     // 為了相容現有的 UI Component，將 StockPosition 映射回 StockSummary
     val baseSummary: StateFlow<StockSummary> = positionState.map { pos ->
