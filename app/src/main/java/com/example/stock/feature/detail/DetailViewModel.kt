@@ -45,6 +45,9 @@ class DetailViewModel @Inject constructor(
     val currentAccountId: StateFlow<Long> = settingsRepository.currentAccountIdFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1L)
 
+    val compactTransactionCard: StateFlow<Boolean> = settingsRepository.compactTransactionCardFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     private val _isCumulative = MutableStateFlow(true)
     val isCumulativeFlow = _isCumulative.asStateFlow()
     var isCumulative by mutableStateOf(true)

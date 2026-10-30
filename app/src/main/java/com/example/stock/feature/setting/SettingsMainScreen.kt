@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -31,6 +32,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -64,6 +66,7 @@ fun SettingsMainScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val isPremium by viewModel.isPremiumUnlocked.collectAsState()
+    val compactTransactionCard by viewModel.compactTransactionCard.collectAsState()
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -285,6 +288,31 @@ fun SettingsMainScreen(
                         }
                     }
                 }
+            }
+
+            item {
+                SettingHeader(
+                    text = "顯示設定",
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                )
+                ListItem(
+                    headlineContent = { Text("交易紀錄精簡排版") },
+                    supportingContent = { Text("單價、股數與金額排成一排，卡片較矮") },
+                    leadingContent = {
+                        Icon(
+                            imageVector = Icons.Default.ViewAgenda,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = compactTransactionCard,
+                            onCheckedChange = { viewModel.setCompactTransactionCard(it) }
+                        )
+                    },
+                    modifier = Modifier.clickable { viewModel.setCompactTransactionCard(!compactTransactionCard) }
+                )
             }
 
             item {

@@ -67,6 +67,7 @@ fun HoldingsDetailScreen(
     val cumulativeProfitData by viewModel.cumulativeProfit.collectAsState()
     val allAccounts by viewModel.allAccounts.collectAsState()
     val currentAccountId by viewModel.currentAccountId.collectAsState()
+    val compactTransactionCard by viewModel.compactTransactionCard.collectAsState()
 
     var showMoveDialog by remember { mutableStateOf(false) }
     var targetAccountForMove by remember { mutableStateOf<com.example.stock.core.data.model.Account?>(null) }
@@ -133,7 +134,7 @@ fun HoldingsDetailScreen(
         LazyColumn(
             modifier = Modifier.padding(innerPadding).fillMaxSize(),
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             item {
                 MainProfitCard(
@@ -183,7 +184,7 @@ fun HoldingsDetailScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .padding(horizontal = 8.dp)
                 ) {
                     // Checkbox
                     AnimatedVisibility(visible = viewModel.isSelectionMode) {
@@ -196,6 +197,7 @@ fun HoldingsDetailScreen(
 
                     TransactionItemCard(
                         transaction = trans,
+                        compact = compactTransactionCard,
                         modifier = Modifier.weight(1f),
                         onClick = {
                             if (viewModel.isSelectionMode) {

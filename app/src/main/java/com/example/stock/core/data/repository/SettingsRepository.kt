@@ -33,4 +33,8 @@ interface SettingsRepository {
 
     val costBasisMethodFlow: Flow<CostBasisMethod>
     suspend fun setCostBasisMethod(method: CostBasisMethod)
+
+    // 交易紀錄卡片是否使用一排三欄的精簡排版
+    val compactTransactionCardFlow: Flow<Boolean>
+    suspend fun setCompactTransactionCard(compact: Boolean)
 }

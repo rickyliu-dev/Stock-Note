@@ -56,6 +56,12 @@ class SettingsViewModel @Inject constructor(
 
     val lastUpdateTimestampFlow = repository.lastUpdateTimestampFlow
 
+    val compactTransactionCard = repository.compactTransactionCardFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = false
+    )
+
 
     init {
         viewModelScope.launch {
@@ -112,6 +118,12 @@ class SettingsViewModel @Inject constructor(
     fun togglePreDeduct(checked: Boolean) {
         showPreDeduct = checked
         autoSaveWithDelay()
+    }
+
+    fun setCompactTransactionCard(compact: Boolean) {
+        viewModelScope.launch {
+            repository.setCompactTransactionCard(compact)
+        }
     }
 
     // 切換顯示/隱藏

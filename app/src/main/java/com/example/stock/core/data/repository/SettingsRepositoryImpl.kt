@@ -37,6 +37,7 @@ class SettingsRepositoryImpl @Inject constructor(
         val COST_BASIS_METHOD = stringPreferencesKey("cost_basis_method")
         val CURRENT_ACCOUNT_ID = longPreferencesKey("current_account_id")
         val LAST_UPDATE_TIMESTAMP = longPreferencesKey("last_update_timestamp")
+        val COMPACT_TRANSACTION_CARD = booleanPreferencesKey("compact_transaction_card")
     }
 
     override val lastUpdateTimestampFlow: Flow<Long> = dataStore.data.map { preferences ->
@@ -134,6 +135,17 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setCostBasisMethod(method: CostBasisMethod) {
         dataStore.edit { preferences ->
             preferences[COST_BASIS_METHOD] = method.name
+        }
+    }
+
+    // 🟢 交易紀錄卡片排版
+    override val compactTransactionCardFlow: Flow<Boolean> = dataStore.data.map { preferences ->
+        preferences[COMPACT_TRANSACTION_CARD] ?: false
+    }
+
+    override suspend fun setCompactTransactionCard(compact: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[COMPACT_TRANSACTION_CARD] = compact
         }
     }
 }

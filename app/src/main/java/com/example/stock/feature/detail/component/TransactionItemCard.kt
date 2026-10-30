@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.stock.core.data.model.TransactionItem
 import com.example.stock.core.data.model.TransactionType
@@ -31,6 +32,7 @@ import com.example.stock.core.ui.component.toCurrencyString
 fun TransactionItemCard(
     transaction: TransactionItem,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
@@ -107,7 +109,65 @@ fun TransactionItemCard(
                 onLongClick = onLongClick
             )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        if (compact) {
+            // 精簡排版：單價、股數、金額排成一排
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 6.dp)
+                ) {
+                    Surface(
+                        color = transaction.type.getColor().copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = transaction.type.label,
+                            color = transaction.type.getColor(),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                    Text(transaction.date.toString(), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                }
+
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    DetailColumn(
+                        title = col1Title,
+                        value = col1Value,
+                        modifier = Modifier.weight(1f)
+                    )
+                    DetailColumn(
+                        title = col2Title,
+                        value = col2Value,
+                        alignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.weight(1f)
+                    )
+                    DetailColumn(
+                        title = totalTitle,
+                        value = totalValue,
+                        alignment = Alignment.End,
+                        valueColor = transaction.type.getColor(),
+                        valueWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                if (transaction.note.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        "📝 ${transaction.note}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        } else Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
@@ -174,10 +234,17 @@ fun TransactionItemCard(
 }
 
 @Composable
-fun DetailColumn(title: String, value: String, alignment: Alignment.Horizontal = Alignment.Start) {
-    Column(horizontalAlignment = alignment) {
+fun DetailColumn(
+    title: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    alignment: Alignment.Horizontal = Alignment.Start,
+    valueColor: Color = Color.Unspecified,
+    valueWeight: FontWeight = FontWeight.Medium
+) {
+    Column(modifier = modifier, horizontalAlignment = alignment) {
         Text(title, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
         Spacer(modifier = Modifier.height(2.dp))
-        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = valueWeight, color = valueColor, maxLines = 1)
     }
 }
