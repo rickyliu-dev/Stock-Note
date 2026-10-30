@@ -36,7 +36,8 @@ fun ProfitOverviewPage(
     onToggleMode: () -> Unit,
     includeDividends: Boolean,
     onToggleDividends: (Boolean) -> Unit,
-    isCashEnabled: Boolean = false
+    isCashEnabled: Boolean = false,
+    onCashClick: () -> Unit = {}
 ) {
     // 這裡直接使用您原本寫好的內容
     val profitColor = if (totalProfit >= 0) Color(0xFFE53935) else Color(0xFF43A047)
@@ -139,6 +140,27 @@ fun ProfitOverviewPage(
                     color = Color.Black,
                     style = MaterialTheme.typography.bodyLarge
                 )
+            }
+
+            // 現金 (帳戶有啟用現金管理才顯示，點擊進入收支明細)
+            if (isCashEnabled) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onCashClick() },
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text(
+                        text = "現金",
+                        color = Color.Gray,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = "$ $formattedCashBalance",
+                        color = Color.Black,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
             }
         }
     }

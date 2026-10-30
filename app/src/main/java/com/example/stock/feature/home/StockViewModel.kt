@@ -191,7 +191,7 @@ class StockViewModel @Inject constructor(
             val initialBalance = currentAccount?.initialBalance ?: 0.0
             val cashEnabled = currentAccount?.isCashManagementEnabled ?: false
             isCashManagementEnabled.value = cashEnabled
-            val cashBalance = if (cashEnabled) initialBalance + calcResult.totalCashFlow else 0.0
+            val cashBalance = if (cashEnabled) calcResult.cashBalance(initialBalance) else 0.0
             
             val holdingsGrossValue = calcResult.positions.values
                 .filter { it.shares > 0 }

@@ -44,7 +44,6 @@ class SettingsViewModel @Inject constructor(
     var discount by mutableStateOf(MarketConstants.Taiwan.DISCOUNT)
     var minFee by mutableStateOf(MarketConstants.Taiwan.DEFAULT_MIN_FEE)
     var showPreDeduct by mutableStateOf(false)
-    var isCashManagementEnabled by mutableStateOf(false)
 
     private val _dashboardSettings = MutableStateFlow<List<DashboardSettingItem>>(emptyList())
     val dashboardSettings = _dashboardSettings.asStateFlow()
@@ -54,8 +53,6 @@ class SettingsViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = false
     )
-
-    val isCashManagementEnabledFlow = repository.isCashManagementEnabledFlow
 
     val lastUpdateTimestampFlow = repository.lastUpdateTimestampFlow
 
@@ -67,12 +64,6 @@ class SettingsViewModel @Inject constructor(
                 discount = d
                 minFee = m
                 showPreDeduct = show
-            }
-        }
-
-        viewModelScope.launch {
-            repository.isCashManagementEnabledFlow.collect { enabled ->
-                isCashManagementEnabled = enabled
             }
         }
 
@@ -121,13 +112,6 @@ class SettingsViewModel @Inject constructor(
     fun togglePreDeduct(checked: Boolean) {
         showPreDeduct = checked
         autoSaveWithDelay()
-    }
-
-    fun toggleCashManagement(checked: Boolean) {
-        isCashManagementEnabled = checked
-        viewModelScope.launch {
-            repository.setCashManagementEnabled(checked)
-        }
     }
 
     // 切換顯示/隱藏

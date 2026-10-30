@@ -24,7 +24,7 @@ enum class TransactionType(val label: String) {
     STOCK_DIVIDEND("股票股利"), // 領股票 (配股)
     DEPOSIT("入金"),          // 存入現金到帳戶
     WITHDRAW("出金"),         // 從帳戶領出資金
-    ADJUSTMENT("調整"),        // 用於退傭、利息支出、差額校正
+    ADJUSTMENT("調整"),        // 將現金餘額直接設為 total (校正與實際餘額的差額)
     CAPITAL_REDUCTION("減資"),  // 退還現金並減少股數
     SPLIT("股票分割");          // 股數增加，股價變小
 

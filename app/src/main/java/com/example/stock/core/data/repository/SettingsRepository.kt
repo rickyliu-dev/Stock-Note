@@ -33,7 +33,4 @@ interface SettingsRepository {
 
     val costBasisMethodFlow: Flow<CostBasisMethod>
     suspend fun setCostBasisMethod(method: CostBasisMethod)
-
-    val isCashManagementEnabledFlow: Flow<Boolean>
-    suspend fun setCashManagementEnabled(enabled: Boolean)
 }

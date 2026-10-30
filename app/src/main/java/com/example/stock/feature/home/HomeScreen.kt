@@ -325,6 +325,7 @@ fun HomeScreen(
                     assetDistribution = assetDistribution,
                     assetHistory = assetHistory,
                     isCashEnabled = isCashEnabled,
+                    onCashClick = { onNavigateToDetail("CASH") },
                     onTimeRangeSelected = { range ->
                         // 未來實作
                     }

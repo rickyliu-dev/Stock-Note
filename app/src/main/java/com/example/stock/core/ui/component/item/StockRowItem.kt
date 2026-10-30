@@ -34,12 +34,8 @@ fun StockRowItem(
     onLongClick: () -> Unit,
     subtitle: String? = null
 ) {
-    val isCash = name.contains("現金")
-    
     // 定義顏色：台股慣例紅漲綠跌
-    val profitColor = if (profit >= 0) {
-        if (isCash) Color.Black else Color(0xFFE53935)
-    } else Color(0xFF43A047)
+    val profitColor = if (profit >= 0) Color(0xFFE53935) else Color(0xFF43A047)
     
     val textColor = Color(0xFF212121)
 
@@ -71,11 +67,7 @@ fun StockRowItem(
             // 股票/股數
             Column(modifier = Modifier.weight(1.2f)) {
                 Text(text = name, fontWeight = FontWeight.Bold, color = textColor, fontSize = 16.sp)
-                val displaySubtitle = subtitle ?: if (!isCash) {
-                    "${shares.toCurrencyString(0)}股"
-                } else {
-                    "查看收支明細"
-                }
+                val displaySubtitle = subtitle ?: "${shares.toCurrencyString(0)}股"
                 Text(text = displaySubtitle, color = Color.Gray, fontSize = 11.sp)
             }
 
@@ -84,39 +76,37 @@ fun StockRowItem(
                 modifier = Modifier.weight(1f), 
                 horizontalAlignment = Alignment.End
             ) {
-                if (!isCash) {
+                Text(
+                    text = currentPrice.toCurrencyString(2),
+                    fontWeight = FontWeight.Bold,
+                    color = textColor,
+                    fontSize = 15.sp, // 稍微縮小 16->15
+                    maxLines = 1
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = currentPrice.toCurrencyString(2),
-                        fontWeight = FontWeight.Bold,
-                        color = textColor,
-                        fontSize = 15.sp, // 稍微縮小 16->15
+                        text = "$sign$formattedChange",
+                        color = changeColor,
+                        fontSize = 10.sp, // 稍微縮小 11->10
+                        fontWeight = FontWeight.Medium,
+                        lineHeight = 11.sp,
                         maxLines = 1
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = "$sign$formattedChange",
-                            color = changeColor,
-                            fontSize = 10.sp, // 稍微縮小 11->10
-                            fontWeight = FontWeight.Medium,
-                            lineHeight = 11.sp,
-                            maxLines = 1
-                        )
-                        Text(
-                            text = "($sign$formattedPercent%)",
-                            color = changeColor,
-                            fontSize = 10.sp, // 稍微縮小 11->10
-                            fontWeight = FontWeight.Medium,
-                            lineHeight = 11.sp,
-                            maxLines = 1
-                        )
-                    }
+                    Text(
+                        text = "($sign$formattedPercent%)",
+                        color = changeColor,
+                        fontSize = 10.sp, // 稍微縮小 11->10
+                        fontWeight = FontWeight.Medium,
+                        lineHeight = 11.sp,
+                        maxLines = 1
+                    )
                 }
             }
 
             // 成本均價
             Text(
-                text = if (isCash) "" else avgCost.toCurrencyString(2),
+                text = avgCost.toCurrencyString(2),
                 modifier = Modifier.weight(0.9f), // 權重從 1 稍微縮減
                 textAlign = TextAlign.End,
                 fontSize = 14.sp, // 稍微縮小 15->14
@@ -124,7 +114,7 @@ fun StockRowItem(
                 maxLines = 1
             )
 
-            // 總損益 (現金則顯示餘額)
+            // 總損益
             Column(
                 modifier = Modifier.weight(1.1f), 
                 horizontalAlignment = Alignment.End
@@ -136,14 +126,12 @@ fun StockRowItem(
                     fontSize = 15.sp, // 稍微縮小 16->15
                     maxLines = 1
                 )
-                if (!isCash) {
-                    Text(
-                        text = "${if (profitPercent > 0) "+" else ""}${profitPercent.toCurrencyString(2)}%",
-                        color = profitColor,
-                        fontSize = 10.sp, // 稍微縮小 11->10
-                        maxLines = 1
-                    )
-                }
+                Text(
+                    text = "${if (profitPercent > 0) "+" else ""}${profitPercent.toCurrencyString(2)}%",
+                    color = profitColor,
+                    fontSize = 10.sp, // 稍微縮小 11->10
+                    maxLines = 1
+                )
             }
         }
         // 分隔線

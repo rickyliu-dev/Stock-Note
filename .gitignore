@@ -20,3 +20,6 @@ local.properties
 *.jks
 
 app/credentials.json
+
+# 個人用的功能規劃筆記
+/docs/新功能列表.md

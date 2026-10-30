@@ -43,6 +43,7 @@ fun DashboardHeader(
     // Page 3: 折線圖資料 (時間戳 -> 總資產)
     assetHistory: List<Pair<Long, Double>> = emptyList(),
     isCashEnabled: Boolean = false,
+    onCashClick: () -> Unit = {},
     onTimeRangeSelected: (String) -> Unit = {} // 切換時間範圍 (1W, 1M, 1Y)
 ) {
     val pages = remember(totalProfit, assetDistribution, assetHistory) {
@@ -89,7 +90,8 @@ fun DashboardHeader(
                             onToggleMode = onToggleMode,
                             includeDividends = includeDividends,
                             onToggleDividends = onToggleDividends,
-                            isCashEnabled = isCashEnabled
+                            isCashEnabled = isCashEnabled,
+                            onCashClick = onCashClick
                         )
                     }
                     is DashboardPage.AssetPieChart -> {

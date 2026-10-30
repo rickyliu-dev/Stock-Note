@@ -83,6 +83,15 @@ fun TransactionItemCard(
             totalValue = "$ ${transaction.total.toCurrencyString(0)}"
         }
 
+        TransactionType.ADJUSTMENT -> {
+            col1Title = "-"
+            col1Value = "-"
+            col2Title = "-"
+            col2Value = "-"
+            totalTitle = "調整後餘額"
+            totalValue = "$ ${transaction.total.toCurrencyString(0)}"
+        }
+
         else -> {
             // 買賣 (BUY, SELL) 維持上面的預設值，什麼都不用做！
         }

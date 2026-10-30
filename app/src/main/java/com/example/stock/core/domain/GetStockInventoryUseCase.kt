@@ -20,10 +20,15 @@ class GetStockInventoryUseCase @Inject constructor(
     data class Result(
         val positions: Map<String, StockPosition>,
         val totalRealizedProfit: Double,
-        val totalCashFlow: Double, // 帳戶現金流 (不含初始餘額)
+        val totalCashFlow: Double, // 帳戶現金流 (有調整時只計算最後一次調整之後的部分)
+        val cashResetBalance: Double?, // 最後一次「調整」設定的餘額，沒有調整則為 null
         val portfolioUnrealizedProfit: Double,
         val portfolioDailyProfit: Double
-    )
+    ) {
+        // 現金餘額：有調整時以調整後的餘額為起點，否則以帳戶初始餘額為起點
+        fun cashBalance(initialBalance: Double): Double =
+            (cashResetBalance ?: initialBalance) + totalCashFlow
+    }
 
     operator fun invoke(
         allTransactions: List<TransactionItem>,
@@ -135,6 +140,7 @@ class GetStockInventoryUseCase @Inject constructor(
             positions = positions,
             totalRealizedProfit = finalTotalRealized,
             totalCashFlow = baseData.totalCashFlow,
+            cashResetBalance = baseData.cashResetBalance,
             portfolioUnrealizedProfit = portfolioUnrealized,
             portfolioDailyProfit = portfolioDaily
         )
@@ -144,7 +150,8 @@ class GetStockInventoryUseCase @Inject constructor(
         val inventoryMap: Map<String, SymbolData>,
         val realizedProfit: Double,
         val totalCashDividend: Double,
-        val totalCashFlow: Double
+        val totalCashFlow: Double,
+        val cashResetBalance: Double?
     )
 
     data class SymbolData(
@@ -168,16 +175,28 @@ class GetStockInventoryUseCase @Inject constructor(
         var totalCashDividend = 0.0
         var totalRealizedProfit = 0.0
         var totalCashFlow = 0.0
+        var cashResetBalance: Double? = null
 
         val sortedTransactions = allTransactions.sortedWith(compareBy<TransactionItem> { it.date }.thenBy { it.id })
 
         for (trade in sortedTransactions) {
-            val state = symbolDataMap.getOrPut(trade.symbol) { SymbolState(trade.name) }
-            
+            // 現金交易只影響現金流，不建立持股項目
             when (trade.type) {
-                TransactionType.DEPOSIT -> totalCashFlow += trade.total
-                TransactionType.WITHDRAW -> totalCashFlow -= trade.total
-                TransactionType.ADJUSTMENT -> totalCashFlow += trade.total
+                TransactionType.DEPOSIT -> { totalCashFlow += trade.total; continue }
+                TransactionType.WITHDRAW -> { totalCashFlow -= trade.total; continue }
+                TransactionType.ADJUSTMENT -> {
+                    // 調整：餘額直接設為輸入的金額，之前的現金流不再計入
+                    cashResetBalance = trade.total
+                    totalCashFlow = 0.0
+                    continue
+                }
+                else -> {}
+            }
+
+            val state = symbolDataMap.getOrPut(trade.symbol) { SymbolState(trade.name) }
+
+            when (trade.type) {
+                TransactionType.DEPOSIT, TransactionType.WITHDRAW, TransactionType.ADJUSTMENT -> {}
                 TransactionType.DIVIDEND -> {
                     // 使用 trade.total (淨額) 而非 trade.dividend (毛額)，以確保扣除匯費後與實際入帳金額一致
                     val netDividend = trade.total
@@ -287,7 +306,8 @@ class GetStockInventoryUseCase @Inject constructor(
             },
             realizedProfit = totalRealizedProfit,
             totalCashDividend = totalCashDividend,
-            totalCashFlow = totalCashFlow
+            totalCashFlow = totalCashFlow,
+            cashResetBalance = cashResetBalance
         )
     }
 

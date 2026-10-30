@@ -93,7 +93,7 @@ class DetailViewModel @Inject constructor(
             // 現金帳戶特殊處理
             val calcResult = getStockInventoryUseCase(transactions, quotes, settings, method)
             val currentAccount = accounts.find { it.id == accId }
-            val balance = (currentAccount?.initialBalance ?: 0.0) + calcResult.totalCashFlow
+            val balance = calcResult.cashBalance(currentAccount?.initialBalance ?: 0.0)
             
             StockPosition(
                 symbol = "CASH",

@@ -251,7 +251,12 @@ class AddTransactionViewModel @Inject constructor(
         }
         val isFeeInvalid = fee < 0.0
         val isTaxInvalid = tax < 0.0
-        val isTotalInvalid = inputTotal <= 0.0
+        // 調整是設定餘額，可以是 0 但不能空白；其他類型金額必須大於 0
+        val isTotalInvalid = if (s.type == TransactionType.ADJUSTMENT) {
+            s.totalStr.isBlank() || inputTotal < 0.0
+        } else {
+            inputTotal <= 0.0
+        }
 
         uiState = s.copy(
             dateError = isDateInvalid,

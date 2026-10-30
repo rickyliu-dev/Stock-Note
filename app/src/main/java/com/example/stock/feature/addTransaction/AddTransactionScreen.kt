@@ -137,16 +137,18 @@ fun AddTransactionScreen(
                         .horizontalScroll(rememberScrollState())
                 ) {
                     TransactionType.entries.filter { item ->
-                        if (state.symbol == "CASH") {
-                            item == TransactionType.DEPOSIT || item == TransactionType.WITHDRAW || item == TransactionType.ADJUSTMENT
-                        } else {
-                            val isCashType = item == TransactionType.DEPOSIT || item == TransactionType.WITHDRAW || item == TransactionType.ADJUSTMENT
-                            if (!state.isCashManagementEnabled && isCashType) {
-                                false
-                            } else {
-                                item != TransactionType.DEPOSIT && item != TransactionType.WITHDRAW && item != TransactionType.ADJUSTMENT
-                            }
+                        val isCashItem = item == TransactionType.DEPOSIT || item == TransactionType.WITHDRAW || item == TransactionType.ADJUSTMENT
+                        when {
+                            // 現金帳戶頁：只有現金類型
+                            state.symbol == "CASH" -> isCashItem
+                            // 首頁新增且帳戶有啟用現金管理：全部類型都可選
+                            !state.isSymbolReadOnly && state.isCashManagementEnabled -> true
+                            // 個股頁或編輯股票交易：只有股票類型
+                            else -> !isCashItem
                         }
+                    }.sortedBy { item ->
+                        // 以股票為主，現金類型排在最後
+                        item == TransactionType.DEPOSIT || item == TransactionType.WITHDRAW || item == TransactionType.ADJUSTMENT
                     }.forEach { item ->
                         FilterChip(
                             selected = state.type == item,
@@ -274,8 +276,11 @@ fun AddTransactionScreen(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
+                // 現金類型只需要金額，不顯示代號、價格、股數與手續費
+                val isCashType = state.type == TransactionType.DEPOSIT || state.type == TransactionType.WITHDRAW || state.type == TransactionType.ADJUSTMENT
+
                 // 股票代號
-                if (state.type != TransactionType.DEPOSIT && state.type != TransactionType.WITHDRAW) {
+                if (!isCashType) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -349,7 +354,7 @@ fun AddTransactionScreen(
                     }
                 }
 
-                if (state.type != TransactionType.DEPOSIT && state.type != TransactionType.WITHDRAW) {
+                if (!isCashType) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxWidth()
@@ -438,9 +443,7 @@ fun AddTransactionScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     // 如果不是賣出且有手續費需求，才在這裡顯示手續費 (例如買入、股息)
-                    if (state.type != TransactionType.SELL &&
-                        state.type != TransactionType.DEPOSIT &&
-                        state.type != TransactionType.WITHDRAW) {
+                    if (state.type != TransactionType.SELL && !isCashType) {
                         OutlinedTextField(
                             value = state.feeStr,
                             onValueChange = { viewModel.onFeeChanged(it) },
@@ -474,7 +477,8 @@ fun AddTransactionScreen(
                                     state.type == TransactionType.STOCK_DIVIDEND -> "配股總數"
                                     state.type == TransactionType.SPLIT -> "分割後總股數"
                                     state.type == TransactionType.CAPITAL_REDUCTION -> "減資後總股數"
-                                    state.type == TransactionType.DEPOSIT || state.type == TransactionType.WITHDRAW -> "金額"
+                                    state.type == TransactionType.ADJUSTMENT -> "調整後餘額"
+                                    isCashType -> "金額"
                                     else -> "總金額"
                                 }
                             )

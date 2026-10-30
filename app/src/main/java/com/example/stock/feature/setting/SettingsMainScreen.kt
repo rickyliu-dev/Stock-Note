@@ -344,7 +344,7 @@ fun SettingsMainScreen(
                                         - 股票股利 (配股) -> STOCK_DIVIDEND
                                         - 入金 (存入現金) -> DEPOSIT
                                         - 出金 (領出資金) -> WITHDRAW
-                                        - 調整 (利息、退傭) -> ADJUSTMENT
+                                        - 調整 (將現金餘額設為 total 金額) -> ADJUSTMENT
                                         - 減資 (退還現金) -> CAPITAL_REDUCTION
                                         - 股票分割 -> SPLIT
                                     - symbol (股票代號)：字串（例如：2330）。

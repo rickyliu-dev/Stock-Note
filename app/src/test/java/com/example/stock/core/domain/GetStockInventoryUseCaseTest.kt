@@ -13,7 +13,6 @@ import kotlinx.datetime.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 
 class GetStockInventoryUseCaseTest {
@@ -206,20 +205,59 @@ class GetStockInventoryUseCaseTest {
     // ---------- 現金與股利 ----------
 
     @Test
-    fun `存款提款調整只影響現金流`() {
+    fun `存款提款只影響現金流`() {
         val r = calculate(
-            tx(TransactionType.DEPOSIT, symbol = "", total = 100000.0),
-            tx(TransactionType.WITHDRAW, symbol = "", total = 30000.0),
-            tx(TransactionType.ADJUSTMENT, symbol = "", total = -500.0)
+            tx(TransactionType.DEPOSIT, symbol = "CASH", total = 100000.0),
+            tx(TransactionType.WITHDRAW, symbol = "CASH", total = 30000.0)
         )
-        assertClose(69500.0, r.totalCashFlow)
+        assertClose(70000.0, r.totalCashFlow)
+        assertClose(80000.0, r.cashBalance(initialBalance = 10000.0))
     }
 
-    @Ignore("已知問題：純現金交易會產生空的持股項目，等現金功能啟用時修正")
     @Test
     fun `只有現金交易時不應產生持股項目`() {
-        val r = calculate(tx(TransactionType.DEPOSIT, symbol = "", total = 100000.0))
-        assertTrue(r.positions.isEmpty())           // 目前預期會失敗，見上面的 bug 說明
+        val r = calculate(
+            tx(TransactionType.DEPOSIT, symbol = "CASH", total = 100000.0),
+            tx(TransactionType.ADJUSTMENT, symbol = "CASH", day = 2, total = 50000.0)
+        )
+        assertTrue(r.positions.isEmpty())
+    }
+
+    @Test
+    fun `調整將餘額直接設為輸入金額`() {
+        val r = calculate(
+            tx(TransactionType.DEPOSIT, symbol = "CASH", day = 1, total = 100000.0),
+            buy(100, 100.0, day = 2),                                             // -10000
+            tx(TransactionType.ADJUSTMENT, symbol = "CASH", day = 3, total = 50000.0)
+        )
+        // 調整之前的初始餘額、入金與買入都不再計入
+        assertClose(50000.0, r.cashBalance(initialBalance = 10000.0))
+    }
+
+    @Test
+    fun `調整之後的交易從調整後餘額繼續計算`() {
+        val r = calculate(
+            tx(TransactionType.ADJUSTMENT, symbol = "CASH", day = 1, total = 50000.0),
+            tx(TransactionType.DEPOSIT, symbol = "CASH", day = 2, total = 20000.0),
+            buy(100, 100.0, day = 3)                                              // -10000
+        )
+        assertClose(60000.0, r.cashBalance(initialBalance = 0.0))
+    }
+
+    @Test
+    fun `多次調整以最後一次為準且日期比新增順序優先`() {
+        val r = calculate(
+            tx(TransactionType.ADJUSTMENT, symbol = "CASH", day = 5, total = 30000.0),
+            tx(TransactionType.ADJUSTMENT, symbol = "CASH", day = 3, total = 99999.0), // 補登較早的調整
+            tx(TransactionType.DEPOSIT, symbol = "CASH", day = 4, total = 1000.0)
+        )
+        assertClose(30000.0, r.cashBalance(initialBalance = 0.0))
+    }
+
+    @Test
+    fun `沒有調整時以初始餘額為起點`() {
+        val r = calculate(buy(100, 100.0))
+        assertClose(-10000.0 + 5000.0, r.cashBalance(initialBalance = 5000.0))
     }
 
     @Test

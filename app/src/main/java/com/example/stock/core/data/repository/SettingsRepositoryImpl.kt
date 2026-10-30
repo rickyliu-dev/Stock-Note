@@ -36,7 +36,6 @@ class SettingsRepositoryImpl @Inject constructor(
         val INCLUDE_DIVIDENDS = booleanPreferencesKey("include_dividends")
         val COST_BASIS_METHOD = stringPreferencesKey("cost_basis_method")
         val CURRENT_ACCOUNT_ID = longPreferencesKey("current_account_id")
-        val IS_CASH_MANAGEMENT_ENABLED = booleanPreferencesKey("is_cash_management_enabled")
         val LAST_UPDATE_TIMESTAMP = longPreferencesKey("last_update_timestamp")
     }
 
@@ -135,17 +134,6 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setCostBasisMethod(method: CostBasisMethod) {
         dataStore.edit { preferences ->
             preferences[COST_BASIS_METHOD] = method.name
-        }
-    }
-
-    // 🟢 現金管理開關
-    override val isCashManagementEnabledFlow: Flow<Boolean> = dataStore.data.map { preferences ->
-        preferences[IS_CASH_MANAGEMENT_ENABLED] ?: false
-    }
-
-    override suspend fun setCashManagementEnabled(enabled: Boolean) {
-        dataStore.edit { preferences ->
-            preferences[IS_CASH_MANAGEMENT_ENABLED] = enabled
         }
     }
 }
