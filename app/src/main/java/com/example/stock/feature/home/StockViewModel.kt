@@ -53,10 +53,6 @@ class StockViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    // 暴露給 HomeScreen 的屬性 (相容舊代碼)
-    val transactions: StateFlow<List<TransactionItem>> = repository.transactionsDesc
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-        
     val allAccounts: StateFlow<List<Account>> = repository.allAccounts
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
         
@@ -225,6 +221,8 @@ class StockViewModel @Inject constructor(
                 summary = summary,
                 activeList = activeList,
                 closedList = closedList,
+                // 更新股價要涵蓋全部持股，不受搜尋篩選影響
+                heldSymbols = calcResult.positions.values.filter { it.shares > 0 }.map { it.symbol },
                 isLoading = false,
                 currentAccountId = accId
             )
@@ -241,7 +239,7 @@ class StockViewModel @Inject constructor(
         isUpdating.value = true
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val symbols = _uiState.value.activeList.map { it.symbol }.distinct()
+                val symbols = _uiState.value.heldSymbols
                 if (symbols.isEmpty()) return@launch
 
                 val newQuotes = _stockQuotes.value.toMutableMap()
@@ -279,9 +277,13 @@ class StockViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.setCurrentAccountId(id) }
     }
     
+    // 只取目前帳戶的交易，避免刪除或移動時動到其他帳戶的同代號紀錄
+    private suspend fun currentAccountTransactions(): List<TransactionItem> =
+        repository.transactionsByAccount(settingsRepository.currentAccountIdFlow.first()).first()
+
     fun deleteStock(symbol: String) {
         viewModelScope.launch {
-            val txs = repository.transactionsDesc.first().filter { it.symbol == symbol }
+            val txs = currentAccountTransactions().filter { it.symbol == symbol }
             repository.deleteTransactionsByIds(txs.map { it.id })
             toastMessage.emit("已刪除 $symbol 的所有紀錄")
         }
@@ -319,7 +321,7 @@ class StockViewModel @Inject constructor(
     fun deleteSelectedStocks() {
         viewModelScope.launch {
             val symbols = selectedSymbols.toList()
-            val txs = repository.transactionsDesc.first().filter { symbols.contains(it.symbol) }
+            val txs = currentAccountTransactions().filter { symbols.contains(it.symbol) }
             repository.deleteTransactionsByIds(txs.map { it.id })
             exitSelectionMode()
             toastMessage.emit("已刪除 ${symbols.size} 支股票")
@@ -329,8 +331,7 @@ class StockViewModel @Inject constructor(
     fun moveSelectedStocks(targetAccountId: Long) {
         viewModelScope.launch {
             val symbols = selectedSymbols.toList()
-            val allTxs = repository.transactionsDesc.first()
-            val txsToMove = allTxs.filter { it.accountId == _uiState.value.currentAccountId && symbols.contains(it.symbol) }
+            val txsToMove = currentAccountTransactions().filter { symbols.contains(it.symbol) }
             val updatedTxs = txsToMove.map { it.copy(accountId = targetAccountId) }
             repository.upsertTransactions(updatedTxs)
             exitSelectionMode()
@@ -357,6 +358,7 @@ data class HomeUiState(
     val summary: PortfolioSummary = PortfolioSummary(),
     val activeList: List<StockDisplayItem> = emptyList(),
     val closedList: List<StockDisplayItem> = emptyList(),
+    val heldSymbols: List<String> = emptyList(),
     val isLoading: Boolean = true,
     val currentAccountId: Long = 1L
 )

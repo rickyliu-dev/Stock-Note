@@ -29,8 +29,7 @@ class GetStockInventoryUseCase @Inject constructor(
         allTransactions: List<TransactionItem>,
         quotes: Map<String, StockQuote> = emptyMap(),
         settings: SettingsRepository.TwSettings = SettingsRepository.TwSettings(),
-        method: CostBasisMethod = CostBasisMethod.AVERAGE_COST,
-        includeDividends: Boolean = false
+        method: CostBasisMethod = CostBasisMethod.AVERAGE_COST
     ): Result = evaluate(calculateBase(allTransactions, method), quotes, settings)
 
     /**

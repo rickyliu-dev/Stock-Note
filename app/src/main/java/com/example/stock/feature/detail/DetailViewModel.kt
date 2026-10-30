@@ -61,39 +61,37 @@ class DetailViewModel @Inject constructor(
     var selectedIds by mutableStateOf(emptySet<Long>())
         private set
 
-    // 所有的相關交易 (用於列表顯示)，直接由資料庫篩選帳戶與股票代號
+    // 帳戶 ID 與該帳戶的交易一起傳遞，確保計算時兩者一定屬於同一個帳戶
     @OptIn(ExperimentalCoroutinesApi::class)
-    val relatedTransactions = settingsRepository.currentAccountIdFlow
-        .flatMapLatest { accountId ->
-            if (symbol == "CASH") {
-                repository.transactionsByAccount(accountId)
-            } else {
-                repository.transactionsBySymbol(accountId, symbol)
+    private val accountTransactions: StateFlow<Pair<Long, List<TransactionItem>>?> =
+        settingsRepository.currentAccountIdFlow
+            .flatMapLatest { accountId ->
+                // 直接由資料庫篩選帳戶與股票代號
+                val transactions = if (symbol == "CASH") {
+                    repository.transactionsByAccount(accountId)
+                } else {
+                    repository.transactionsBySymbol(accountId, symbol)
+                }
+                transactions.map { accountId to it }
             }
-        }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    // 所有的相關交易 (用於列表顯示)
+    val relatedTransactions: StateFlow<List<TransactionItem>> = accountTransactions
+        .map { it?.second ?: emptyList() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // 核心數據流：調用統一的 UseCase
     private val positionState: StateFlow<StockPosition?> = combine(
-        relatedTransactions,
+        accountTransactions.filterNotNull(),
         repository.stockPricesFlow,
         settingsRepository.twSettingsFlow,
         settingsRepository.costBasisMethodFlow,
-        settingsRepository.includeDividendsFlow,
-        repository.allAccounts,
-        currentAccountId
-    ) { args ->
-        val transactions = args[0] as List<TransactionItem>
-        val quotes = args[1] as Map<String, com.example.stock.core.data.dataClass.StockQuote>
-        val settings = args[2] as SettingsRepository.TwSettings
-        val method = args[3] as com.example.stock.core.data.model.CostBasisMethod
-        val includeDiv = args[4] as Boolean
-        val accounts = args[5] as List<Account>
-        val accId = args[6] as Long
-
+        repository.allAccounts
+    ) { (accId, transactions), quotes, settings, method, accounts ->
         if (symbol == "CASH") {
             // 現金帳戶特殊處理
-            val calcResult = getStockInventoryUseCase(transactions, quotes, settings, method, includeDiv)
+            val calcResult = getStockInventoryUseCase(transactions, quotes, settings, method)
             val currentAccount = accounts.find { it.id == accId }
             val balance = (currentAccount?.initialBalance ?: 0.0) + calcResult.totalCashFlow
             
@@ -105,7 +103,7 @@ class DetailViewModel @Inject constructor(
                 yesterdayNetValue = balance
             )
         } else {
-            val calcResult = getStockInventoryUseCase(transactions, quotes, settings, method, includeDiv)
+            val calcResult = getStockInventoryUseCase(transactions, quotes, settings, method)
             calcResult.positions[symbol]
         }
     }.flowOn(Dispatchers.Default)
