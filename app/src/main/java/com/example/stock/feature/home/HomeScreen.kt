@@ -18,6 +18,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -78,6 +81,7 @@ import com.example.stock.core.ui.component.modifier.secretClick
 import com.example.stock.feature.home.component.DashboardHeader
 import com.example.stock.feature.home.component.dialog.UnlockPremiumDialog
 import com.example.stock.core.data.model.Account
+import com.example.stock.core.data.model.HomeSortOrder
 import com.example.stock.core.data.model.TransactionItem
 import com.example.stock.feature.home.component.PortfolioSummary
 import com.example.stock.feature.home.component.StockDisplayItem
@@ -101,6 +105,11 @@ fun HomeScreen(
     val activeList by viewModel.activeStockList.collectAsStateWithLifecycle()
     val closedList by viewModel.closedStockList.collectAsStateWithLifecycle()
     val isCashEnabled by viewModel.isCashManagementEnabled.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val activeTotalCount by viewModel.activeTotalCount.collectAsStateWithLifecycle()
+    val closedTotalCount by viewModel.closedTotalCount.collectAsStateWithLifecycle()
+    val homeSort by viewModel.homeSort.collectAsStateWithLifecycle()
+    var showSortMenu by remember { mutableStateOf(false) }
 
     // 多選模式
     val isSelectionMode = viewModel.isSelectionMode
@@ -146,6 +155,11 @@ fun HomeScreen(
 
     val summary by viewModel.portfolioSummary.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+
+    // 分頁數量：平常顯示總數，搜尋時顯示「符合筆數/總數」
+    val isSearching = searchQuery.isNotBlank()
+    val activeCountText = if (isSearching) "${activeList.size}/$activeTotalCount" else "$activeTotalCount"
+    val closedCountText = if (isSearching) "${closedList.size}/$closedTotalCount" else "$closedTotalCount"
 
     val context = LocalContext.current
     val excelPickerLauncher = rememberLauncherForActivityResult(
@@ -368,16 +382,73 @@ fun HomeScreen(
             // 🟢 3. 加入分頁標籤列 (TabRow)
             item {
                 Column(modifier = Modifier.background(Color.White)) {
-                    if (lastUpdateTimestamp > 0) {
-                        Text(
-                            text = lastUpdateText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp),
-                            textAlign = TextAlign.End
-                        )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 4.dp, end = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // 排序：點文字選排序依據，點箭頭切換由大到小 / 由小到大
+                        Box {
+                            TextButton(onClick = { showSortMenu = true }) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.Sort,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = Color.Gray
+                                )
+                                Text(
+                                    "排序：${homeSort.order.label}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.Gray,
+                                    modifier = Modifier.padding(start = 4.dp)
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showSortMenu,
+                                onDismissRequest = { showSortMenu = false }
+                            ) {
+                                HomeSortOrder.entries.forEach { order ->
+                                    DropdownMenuItem(
+                                        text = { Text(order.label) },
+                                        onClick = {
+                                            viewModel.setHomeSort(homeSort.copy(order = order))
+                                            showSortMenu = false
+                                        },
+                                        trailingIcon = {
+                                            if (order == homeSort.order) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFFEF4444)
+                                                )
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        if (homeSort.order != HomeSortOrder.DEFAULT) {
+                            IconButton(
+                                onClick = { viewModel.setHomeSort(homeSort.copy(descending = !homeSort.descending)) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (homeSort.descending) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
+                                    contentDescription = if (homeSort.descending) "由大到小" else "由小到大",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = Color.Gray
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                        if (lastUpdateTimestamp > 0) {
+                            Text(
+                                text = lastUpdateText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray
+                            )
+                        }
                     }
                     TabRow(
                         selectedTabIndex = selectedTabIndex,
@@ -393,12 +464,12 @@ fun HomeScreen(
                         Tab(
                             selected = selectedTabIndex == 0,
                             onClick = { mainViewModel.selectTab(0) },
-                            text = { Text(androidx.compose.ui.res.stringResource(com.example.stock.R.string.portfolio_active, activeList.size), fontWeight = if (selectedTabIndex == 0) FontWeight.Bold else FontWeight.Normal) }
+                            text = { Text(androidx.compose.ui.res.stringResource(com.example.stock.R.string.portfolio_active, activeCountText), fontWeight = if (selectedTabIndex == 0) FontWeight.Bold else FontWeight.Normal) }
                         )
                         Tab(
                             selected = selectedTabIndex == 1,
                             onClick = { mainViewModel.selectTab(1) },
-                            text = { Text(androidx.compose.ui.res.stringResource(com.example.stock.R.string.portfolio_closed, closedList.size), fontWeight = if (selectedTabIndex == 1) FontWeight.Bold else FontWeight.Normal) }
+                            text = { Text(androidx.compose.ui.res.stringResource(com.example.stock.R.string.portfolio_closed, closedCountText), fontWeight = if (selectedTabIndex == 1) FontWeight.Bold else FontWeight.Normal) }
                         )
                     }
                 }
@@ -434,10 +505,10 @@ fun HomeScreen(
             }
 
             val emptyMessage = when {
-                currentList.isNotEmpty() -> null
+                currentList.isNotEmpty() || isLoading -> null
                 searchQuery.isNotBlank() -> "找不到符合「${searchQuery.trim()}」的股票"
                 selectedTabIndex == 1 -> "目前沒有已清倉的股票"
-                else -> null
+                else -> "目前沒有持股\n點右下角的 ＋ 新增第一筆交易"
             }
 
             if (emptyMessage != null) {
@@ -448,7 +519,8 @@ fun HomeScreen(
                     ) {
                         Text(
                             text = emptyMessage,
-                            color = Color.Gray
+                            color = Color.Gray,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }

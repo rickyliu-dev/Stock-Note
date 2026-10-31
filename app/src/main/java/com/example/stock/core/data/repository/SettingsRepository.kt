@@ -1,8 +1,10 @@
 package com.example.stock.core.data.repository
 
 import com.example.stock.core.data.MarketConstants
+import com.example.stock.core.data.model.AutoBackupInterval
 import com.example.stock.core.data.model.CostBasisMethod
 import com.example.stock.core.data.model.DashboardSettingItem
+import com.example.stock.core.data.model.HomeSort
 import kotlinx.coroutines.flow.Flow
 
 interface SettingsRepository {
@@ -37,4 +39,12 @@ interface SettingsRepository {
     // 交易紀錄卡片是否使用一排三欄的精簡排版
     val compactTransactionCardFlow: Flow<Boolean>
     suspend fun setCompactTransactionCard(compact: Boolean)
+
+    // 自動備份到 Google Drive 的頻率
+    val autoBackupIntervalFlow: Flow<AutoBackupInterval>
+    suspend fun setAutoBackupInterval(interval: AutoBackupInterval)
+
+    // 首頁股票清單的排序方式
+    val homeSortFlow: Flow<HomeSort>
+    suspend fun setHomeSort(sort: HomeSort)
 }

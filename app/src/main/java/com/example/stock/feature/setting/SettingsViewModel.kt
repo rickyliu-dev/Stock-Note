@@ -9,10 +9,12 @@ import androidx.lifecycle.viewModelScope
 import com.example.stock.core.data.EnterConstants
 import com.example.stock.core.data.MarketConstants
 import com.example.stock.core.data.enumClass.DashboardIds
+import com.example.stock.core.data.model.AutoBackupInterval
 import com.example.stock.core.data.model.DashboardSettingItem
 import com.example.stock.core.data.model.TransactionItem
 import com.example.stock.core.data.repository.SettingsRepository
 import com.example.stock.core.data.repository.TransactionRepository
+import com.example.stock.core.util.AutoBackupScheduler
 import com.example.stock.core.util.CsvManager
 import com.example.stock.core.util.GoogleDriveManager
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
@@ -34,6 +36,7 @@ class SettingsViewModel @Inject constructor(
     private val repository: SettingsRepository,
     private val transactionRepository: TransactionRepository,
     private val googleDriveManager: GoogleDriveManager,
+    private val autoBackupScheduler: AutoBackupScheduler,
     private val importExcelUseCase: com.example.stock.core.domain.ImportExcelUseCase,
     private val importCsvUseCase: com.example.stock.core.domain.ImportCsvUseCase
 ) : ViewModel() {
@@ -55,6 +58,12 @@ class SettingsViewModel @Inject constructor(
     )
 
     val lastUpdateTimestampFlow = repository.lastUpdateTimestampFlow
+
+    val autoBackupInterval = repository.autoBackupIntervalFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = AutoBackupInterval.OFF
+    )
 
     val compactTransactionCard = repository.compactTransactionCardFlow.stateIn(
         scope = viewModelScope,
@@ -118,6 +127,13 @@ class SettingsViewModel @Inject constructor(
     fun togglePreDeduct(checked: Boolean) {
         showPreDeduct = checked
         autoSaveWithDelay()
+    }
+
+    fun setAutoBackupInterval(interval: AutoBackupInterval) {
+        viewModelScope.launch {
+            repository.setAutoBackupInterval(interval)
+            autoBackupScheduler.schedule(interval)
+        }
     }
 
     fun setCompactTransactionCard(compact: Boolean) {

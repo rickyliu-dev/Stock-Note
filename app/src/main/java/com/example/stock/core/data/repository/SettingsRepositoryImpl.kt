@@ -9,8 +9,11 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.stock.core.data.MarketConstants
+import com.example.stock.core.data.model.AutoBackupInterval
 import com.example.stock.core.data.model.CostBasisMethod
 import com.example.stock.core.data.model.DashboardSettingItem
+import com.example.stock.core.data.model.HomeSort
+import com.example.stock.core.data.model.HomeSortOrder
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -38,6 +41,9 @@ class SettingsRepositoryImpl @Inject constructor(
         val CURRENT_ACCOUNT_ID = longPreferencesKey("current_account_id")
         val LAST_UPDATE_TIMESTAMP = longPreferencesKey("last_update_timestamp")
         val COMPACT_TRANSACTION_CARD = booleanPreferencesKey("compact_transaction_card")
+        val AUTO_BACKUP_INTERVAL = stringPreferencesKey("auto_backup_interval")
+        val HOME_SORT_ORDER = stringPreferencesKey("home_sort_order")
+        val HOME_SORT_DESCENDING = booleanPreferencesKey("home_sort_descending")
     }
 
     override val lastUpdateTimestampFlow: Flow<Long> = dataStore.data.map { preferences ->
@@ -146,6 +152,40 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setCompactTransactionCard(compact: Boolean) {
         dataStore.edit { preferences ->
             preferences[COMPACT_TRANSACTION_CARD] = compact
+        }
+    }
+
+    // 🟢 自動備份頻率
+    override val autoBackupIntervalFlow: Flow<AutoBackupInterval> = dataStore.data.map { preferences ->
+        val intervalStr = preferences[AUTO_BACKUP_INTERVAL] ?: AutoBackupInterval.OFF.name
+        try {
+            AutoBackupInterval.valueOf(intervalStr)
+        } catch (e: Exception) {
+            AutoBackupInterval.OFF
+        }
+    }
+
+    override suspend fun setAutoBackupInterval(interval: AutoBackupInterval) {
+        dataStore.edit { preferences ->
+            preferences[AUTO_BACKUP_INTERVAL] = interval.name
+        }
+    }
+
+    // 🟢 首頁排序
+    override val homeSortFlow: Flow<HomeSort> = dataStore.data.map { preferences ->
+        val orderStr = preferences[HOME_SORT_ORDER] ?: HomeSortOrder.DEFAULT.name
+        val order = try {
+            HomeSortOrder.valueOf(orderStr)
+        } catch (e: Exception) {
+            HomeSortOrder.DEFAULT
+        }
+        HomeSort(order, preferences[HOME_SORT_DESCENDING] ?: true)
+    }
+
+    override suspend fun setHomeSort(sort: HomeSort) {
+        dataStore.edit { preferences ->
+            preferences[HOME_SORT_ORDER] = sort.order.name
+            preferences[HOME_SORT_DESCENDING] = sort.descending
         }
     }
 }

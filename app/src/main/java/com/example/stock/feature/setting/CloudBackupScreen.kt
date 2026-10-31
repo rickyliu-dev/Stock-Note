@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.stock.core.data.model.AutoBackupInterval
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import java.text.SimpleDateFormat
 import java.util.*
@@ -38,6 +40,7 @@ fun CloudBackupScreen(
     val context = LocalContext.current
     val isBackupLoading by viewModel.isBackupLoading.collectAsState()
     val lastUpdateTimestamp by viewModel.lastUpdateTimestampFlow.collectAsState(initial = 0L)
+    val autoBackupInterval by viewModel.autoBackupInterval.collectAsState()
     
     var currentAccount by remember { mutableStateOf(GoogleSignIn.getLastSignedInAccount(context)) }
     var showLogoutConfirm by remember { mutableStateOf(false) }
@@ -112,6 +115,7 @@ fun CloudBackupScreen(
                 .padding(padding)
                 .fillMaxSize()
                 .background(Color(0xFFF8FAFC))
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -210,9 +214,42 @@ fun CloudBackupScreen(
                 }
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 3. 自動備份頻率
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("自動備份", fontSize = 14.sp, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AutoBackupInterval.entries.forEach { interval ->
+                            FilterChip(
+                                selected = autoBackupInterval == interval,
+                                onClick = { viewModel.setAutoBackupInterval(interval) },
+                                label = { Text(interval.label) },
+                                // 未登入時只能關閉
+                                enabled = currentAccount != null || interval == AutoBackupInterval.OFF
+                            )
+                        }
+                    }
+                    Text(
+                        text = if (currentAccount == null) "請先登入 Google 帳號才能啟用自動備份"
+                        else "有網路且電量充足時，會在背景自動備份，不需開啟 App",
+                        modifier = Modifier.padding(top = 4.dp),
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(32.dp))
 
-            // 3. 操作按鈕
+            // 4. 操作按鈕
             if (isBackupLoading) {
                 CircularProgressIndicator()
                 Text("正在處理中，請稍候...", modifier = Modifier.padding(top = 16.dp), color = Color.Gray)

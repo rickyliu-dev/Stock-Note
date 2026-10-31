@@ -48,6 +48,13 @@ enum class CostBasisMethod(val label: String) {
     FIFO("先進先出法");
 }
 
+// 自動備份頻率 (days 為 0 代表關閉)
+enum class AutoBackupInterval(val label: String, val days: Int) {
+    OFF("關閉", 0),
+    DAILY("每天", 1),
+    WEEKLY("每週", 7);
+}
+
 @Entity(tableName = "accounts")
 data class Account(
     @PrimaryKey(autoGenerate = true)

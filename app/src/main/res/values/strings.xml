@@ -1,6 +1,7 @@
 <resources>
-    <string name="portfolio_active">持有中 (%1$d)</string>
-    <string name="portfolio_closed">已清倉 (%1$d)</string>
+    <!-- %1$s 為數量文字：平常是總數，搜尋時是「符合筆數/總數」 -->
+    <string name="portfolio_active">持有中 (%1$s)</string>
+    <string name="portfolio_closed">已清倉 (%1$s)</string>
     <string name="search_placeholder">搜尋股票代碼或名稱</string>
     <string name="delete_confirm_title">刪除股票紀錄</string>
     <string name="delete_confirm_msg">確定要刪除選中的 %1$d 支股票及其所有交易紀錄嗎？此動作無法復原。</string>
