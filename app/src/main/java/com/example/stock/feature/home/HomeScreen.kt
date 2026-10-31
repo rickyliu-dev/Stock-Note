@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -96,11 +97,13 @@ fun HomeScreen(
     mainViewModel: MainViewModel,
     onNavigateToDetail: (String) -> Unit,
     onNavigateToAdd: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToReport: () -> Unit
 ) {
     // 從 VM 觀察資料
     val assetDistribution by viewModel.assetDistribution.collectAsStateWithLifecycle()
     val assetHistory by viewModel.assetHistory.collectAsStateWithLifecycle()
+    val assetRange by viewModel.assetRange.collectAsStateWithLifecycle()
     val isUpdating by viewModel.isUpdating.collectAsStateWithLifecycle()
     val activeList by viewModel.activeStockList.collectAsStateWithLifecycle()
     val closedList by viewModel.closedStockList.collectAsStateWithLifecycle()
@@ -302,6 +305,12 @@ fun HomeScreen(
                                 Icon(Icons.Default.Refresh, "Update")
                             }
                         }
+                        IconButton(onClick = onNavigateToReport) {
+                            Icon(
+                                imageVector = Icons.Default.BarChart,
+                                contentDescription = "統計報表"
+                            )
+                        }
                         IconButton(onClick = onNavigateToSettings) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
@@ -338,11 +347,10 @@ fun HomeScreen(
                     },
                     assetDistribution = assetDistribution,
                     assetHistory = assetHistory,
+                    selectedTimeRange = assetRange,
                     isCashEnabled = isCashEnabled,
                     onCashClick = { onNavigateToDetail("CASH") },
-                    onTimeRangeSelected = { range ->
-                        // 未來實作
-                    }
+                    onTimeRangeSelected = { range -> viewModel.selectAssetRange(range) }
                 )
             }
 

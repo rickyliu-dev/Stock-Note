@@ -10,14 +10,16 @@ fun NavGraphBuilder.homeGraph(
     mainViewModel: MainViewModel,
     onNavigateToDetail: (String) -> Unit,
     onNavigateToAdd: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToReport: () -> Unit
 ) {
     composable(route = AllScreens.Home.route) {
         HomeScreen(
             mainViewModel = mainViewModel,
             onNavigateToDetail = onNavigateToDetail,
             onNavigateToAdd = onNavigateToAdd,
-            onNavigateToSettings = onNavigateToSettings
+            onNavigateToSettings = onNavigateToSettings,
+            onNavigateToReport = onNavigateToReport
         )
     }
 }

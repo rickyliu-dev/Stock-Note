@@ -10,6 +10,7 @@ import com.example.stock.AppNavAnimations
 import com.example.stock.feature.addTransaction.addTransactionGraph
 import com.example.stock.feature.detail.detailGraph
 import com.example.stock.feature.home.homeGraph
+import com.example.stock.feature.report.reportGraph
 import com.example.stock.feature.setting.settingsGraph
 
 @Composable
@@ -36,7 +37,15 @@ fun MainNavGraph(
             },
             onNavigateToSettings = {
                 navController.navigate(AllScreens.Settings.route)
+            },
+            onNavigateToReport = {
+                navController.navigate(AllScreens.Report.route)
             }
+        )
+
+        // 統計報表
+        reportGraph(
+            onBackClick = { navController.popBackStack() }
         )
 
         // 詳情頁

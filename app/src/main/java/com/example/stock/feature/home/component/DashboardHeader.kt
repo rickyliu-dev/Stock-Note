@@ -23,6 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.example.stock.core.data.model.AssetHistoryRange
+import com.example.stock.core.data.model.AssetSnapshot
 import com.example.stock.feature.home.DashboardPage
 
 @Composable
@@ -40,11 +42,12 @@ fun DashboardHeader(
     // Page 2: 圓餅圖資料 (股票代號 -> 市值)
     assetDistribution: Map<String, Double> = emptyMap(),
 
-    // Page 3: 折線圖資料 (時間戳 -> 總資產)
-    assetHistory: List<Pair<Long, Double>> = emptyList(),
+    // Page 3: 折線圖資料 (每日總資產，由舊到新)
+    assetHistory: List<AssetSnapshot> = emptyList(),
+    selectedTimeRange: AssetHistoryRange = AssetHistoryRange.MONTH,
     isCashEnabled: Boolean = false,
     onCashClick: () -> Unit = {},
-    onTimeRangeSelected: (String) -> Unit = {} // 切換時間範圍 (1W, 1M, 1Y)
+    onTimeRangeSelected: (AssetHistoryRange) -> Unit = {}
 ) {
     val pages = remember(totalProfit, assetDistribution, assetHistory) {
         buildList {
@@ -56,8 +59,8 @@ fun DashboardHeader(
                 add(DashboardPage.AssetPieChart(assetDistribution))
             }
 
-            // 取消註解這裡就能動態增加第三頁
-            // add(DashboardPage.AssetLineChart(assetHistory))
+            // 資產走勢永遠顯示，沒有資料時頁面內會顯示說明 (避免切換範圍時頁面消失)
+            add(DashboardPage.AssetLineChart(assetHistory))
         }
     }
     // 總共有 3 頁
@@ -100,6 +103,7 @@ fun DashboardHeader(
                     is DashboardPage.AssetLineChart -> {
                         AssetLineChartPage(
                             historyData = pageItem.historyData,
+                            selectedRange = selectedTimeRange,
                             onRangeSelected = onTimeRangeSelected
                         )
                     }

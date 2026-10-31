@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
+import com.example.stock.core.data.model.AssetSnapshotDao
 import com.example.stock.core.data.model.TransactionDao
 import com.example.stock.dataBase.StockDatabase
 import dagger.Module
@@ -32,6 +33,11 @@ object DatabaseModule {
     @Provides
     fun provideStockDao(database: StockDatabase): TransactionDao {
         return database.transactionDao()
+    }
+
+    @Provides
+    fun provideAssetSnapshotDao(database: StockDatabase): AssetSnapshotDao {
+        return database.assetSnapshotDao()
     }
 
     @Provides

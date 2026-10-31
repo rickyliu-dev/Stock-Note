@@ -1,5 +1,7 @@
 package com.example.stock.feature.home
 
+import com.example.stock.core.data.model.AssetSnapshot
+
 sealed class DashboardPage {
     data class ProfitOverview(
         val totalProfit: Double,
@@ -12,6 +14,6 @@ sealed class DashboardPage {
     ) : DashboardPage()
 
     data class AssetLineChart(
-        val historyData: List<Pair<Long, Double>>
+        val historyData: List<AssetSnapshot>
     ) : DashboardPage()
 }

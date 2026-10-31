@@ -10,6 +10,9 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewModelScope
 import com.example.stock.core.data.dataClass.StockQuote
 import com.example.stock.core.data.model.Account
+import com.example.stock.core.data.model.AssetHistoryRange
+import com.example.stock.core.data.model.AssetSnapshot
+import com.example.stock.core.data.repository.AssetHistoryRepository
 import com.example.stock.core.data.model.HomeSort
 import com.example.stock.core.data.model.HomeSortOrder
 import com.example.stock.core.data.model.TransactionItem
@@ -23,9 +26,14 @@ import com.example.stock.feature.home.component.StockDisplayItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.todayIn
 import java.time.Instant
 import java.time.ZonedDateTime
 import javax.inject.Inject
@@ -36,7 +44,8 @@ class StockViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val stockRepository: StockRepository,
     private val getStockInventoryUseCase: GetStockInventoryUseCase,
-    private val importExcelUseCase: com.example.stock.core.domain.ImportExcelUseCase
+    private val importExcelUseCase: com.example.stock.core.domain.ImportExcelUseCase,
+    private val assetHistoryRepository: AssetHistoryRepository
 ) : ViewModel() {
 
     fun importFromExcel(context: android.content.Context, uri: android.net.Uri) {
@@ -78,7 +87,22 @@ class StockViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     
     val assetDistribution = MutableStateFlow<Map<String, Double>>(emptyMap())
-    val assetHistory = MutableStateFlow<List<Pair<Long, Double>>>(emptyList())
+
+    // 資產走勢圖：目前帳戶在選定範圍內的每日總資產
+    private val _assetRange = MutableStateFlow(AssetHistoryRange.MONTH)
+    val assetRange: StateFlow<AssetHistoryRange> = _assetRange.asStateFlow()
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val assetHistory: StateFlow<List<AssetSnapshot>> = combine(
+        settingsRepository.currentAccountIdFlow.flatMapLatest { assetHistoryRepository.snapshots(it) },
+        _assetRange
+    ) { snapshots, range ->
+        range.filter(snapshots, today())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun selectAssetRange(range: AssetHistoryRange) {
+        _assetRange.value = range
+    }
     val isUpdating = MutableStateFlow(false)
     
     val activeStockList: StateFlow<List<StockDisplayItem>> = uiState.map { it.activeList }
@@ -123,6 +147,28 @@ class StockViewModel @Inject constructor(
         setupDataStreams()
         loadInitialData()
         startAutoUpdateCycle()
+        startAssetSnapshotRecorder()
+    }
+
+    private fun today(): LocalDate = Clock.System.todayIn(TimeZone.currentSystemDefault())
+
+    /**
+     * 記錄今天的總資產：總覽變動後等 3 秒沒有再變才寫入，避免更新股價時逐檔寫入
+     * 同一天會覆蓋為最後一次的數值；總資產為 0 (空帳戶) 時不記錄
+     */
+    @OptIn(FlowPreview::class)
+    private fun startAssetSnapshotRecorder() {
+        _uiState
+            .filter { !it.isLoading }
+            .map { it.currentAccountId to it.summary }
+            .distinctUntilChanged()
+            .debounce(3000)
+            .onEach { (accId, summary) ->
+                if (summary.totalAssets > 0) {
+                    assetHistoryRepository.record(accId, today(), summary.totalAssets, summary.cashBalance)
+                }
+            }
+            .launchIn(viewModelScope)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

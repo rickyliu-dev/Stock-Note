@@ -5,19 +5,23 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.example.stock.core.data.model.Account
+import com.example.stock.core.data.model.AssetSnapshot
+import com.example.stock.core.data.model.AssetSnapshotDao
 import com.example.stock.core.data.model.Converters
 import com.example.stock.core.data.model.StockPriceEntity
 import com.example.stock.core.data.model.Transaction
 import com.example.stock.core.data.model.TransactionDao
 
 @Database(
-    entities = [Transaction::class, StockPriceEntity::class, Account::class],
-    version = 26,
+    entities = [Transaction::class, StockPriceEntity::class, Account::class, AssetSnapshot::class],
+    version = 27,
     autoMigrations = [
-        AutoMigration(from = 25, to = 26) // 新增 transactions (accountId, symbol, date) 索引
+        AutoMigration(from = 25, to = 26), // 新增 transactions (accountId, symbol, date) 索引
+        AutoMigration(from = 26, to = 27)  // 新增 asset_snapshots 資產走勢表
     ]
 )
 @TypeConverters(Converters::class)
 abstract class StockDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
+    abstract fun assetSnapshotDao(): AssetSnapshotDao
 }

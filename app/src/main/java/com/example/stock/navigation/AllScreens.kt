@@ -12,6 +12,7 @@ sealed class AllScreens(val route: String) {
     object Settings : AllScreens("settings_main")
     object AccountManagement : AllScreens("account_management")
     object CloudBackup : AllScreens("cloud_backup")
+    object Report : AllScreens("report")
 
     // ==========================================
     // 設定專區的子畫面

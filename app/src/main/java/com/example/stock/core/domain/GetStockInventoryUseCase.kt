@@ -8,6 +8,7 @@ import com.example.stock.core.data.model.TransactionItem
 import com.example.stock.core.data.model.TransactionType
 import com.example.stock.core.data.repository.SettingsRepository
 import com.example.stock.core.domain.model.StockPosition
+import kotlinx.datetime.LocalDate
 import javax.inject.Inject
 
 /**
@@ -151,7 +152,32 @@ class GetStockInventoryUseCase @Inject constructor(
         val realizedProfit: Double,
         val totalCashDividend: Double,
         val totalCashFlow: Double,
-        val cashResetBalance: Double?
+        val cashResetBalance: Double?,
+        // 每一筆產生已實現損益的交易 (依日期排序)，供年度報表使用
+        val realizedEvents: List<RealizedEvent> = emptyList(),
+        // 股票相關的現金流 (買進為負，賣出、股息、減資退款為正)，供 XIRR 使用
+        val investmentFlows: List<InvestmentFlow> = emptyList()
+    )
+
+    data class InvestmentFlow(
+        val date: LocalDate,
+        val symbol: String,
+        val amount: Double
+    )
+
+    /**
+     * 單筆已實現損益：賣出，或減資退還現金超過剩餘成本的部分
+     * proceeds 為實收淨額，cost 為對應的成本，profit = proceeds - cost
+     */
+    data class RealizedEvent(
+        val date: LocalDate,
+        val type: TransactionType,
+        val symbol: String,
+        val name: String,
+        val shares: Double,
+        val proceeds: Double,
+        val cost: Double,
+        val profit: Double
     )
 
     data class SymbolData(
@@ -176,6 +202,8 @@ class GetStockInventoryUseCase @Inject constructor(
         var totalRealizedProfit = 0.0
         var totalCashFlow = 0.0
         var cashResetBalance: Double? = null
+        val realizedEvents = mutableListOf<RealizedEvent>()
+        val investmentFlows = mutableListOf<InvestmentFlow>()
 
         val sortedTransactions = allTransactions.sortedWith(compareBy<TransactionItem> { it.date }.thenBy { it.id })
 
@@ -203,6 +231,7 @@ class GetStockInventoryUseCase @Inject constructor(
                     state.dividendAmount += netDividend
                     totalCashDividend += netDividend
                     totalCashFlow += netDividend
+                    investmentFlows += InvestmentFlow(trade.date, trade.symbol, netDividend)
                 }
                 TransactionType.BUY -> {
                     val totalPay = (trade.price * trade.shares) + trade.fee
@@ -212,6 +241,7 @@ class GetStockInventoryUseCase @Inject constructor(
                     state.buyShares += trade.shares
                     state.pureBuyTotal += (trade.price * trade.shares)
                     totalCashFlow -= totalPay
+                    investmentFlows += InvestmentFlow(trade.date, trade.symbol, -totalPay)
                     
                     if (method == CostBasisMethod.FIFO) {
                         state.fifoLots.add(trade.shares.toDouble() to (totalPay / trade.shares))
@@ -245,12 +275,17 @@ class GetStockInventoryUseCase @Inject constructor(
                         val profit = sellNetRevenue - costOfGoodsSold
                         state.realizedProfit += profit
                         totalRealizedProfit += profit
+                        realizedEvents += RealizedEvent(
+                            trade.date, trade.type, trade.symbol, state.name,
+                            actualSoldShares, sellNetRevenue, costOfGoodsSold, profit
+                        )
                         
                         state.shares -= actualSoldShares
                         state.totalCostPool -= costOfGoodsSold
                         state.totalSellAmount += sellNetRevenue
                         state.sellShares += actualSoldShares
                         totalCashFlow += sellNetRevenue
+                        investmentFlows += InvestmentFlow(trade.date, trade.symbol, sellNetRevenue)
                     }
                 }
                 TransactionType.STOCK_DIVIDEND, TransactionType.SPLIT -> {
@@ -279,13 +314,18 @@ class GetStockInventoryUseCase @Inject constructor(
                     val excess = cashReturned - state.totalCostPool
                     if (excess > 0) {
                         state.realizedProfit += excess
+                        realizedEvents += RealizedEvent(
+                            trade.date, trade.type, trade.symbol, state.name,
+                            0.0, cashReturned, state.totalCostPool, excess
+                        )
                         state.totalCostPool = 0.0
                     } else {
                         state.totalCostPool -= cashReturned
                     }
 
                     totalCashFlow += cashReturned
-                    
+                    investmentFlows += InvestmentFlow(trade.date, trade.symbol, cashReturned)
+
                     if (method == CostBasisMethod.FIFO && oldShares > 0) {
                         val ratio = state.shares / oldShares
                         val cashPerOldShare = if (oldShares != 0.0) cashReturned / oldShares else 0.0
@@ -307,7 +347,9 @@ class GetStockInventoryUseCase @Inject constructor(
             realizedProfit = totalRealizedProfit,
             totalCashDividend = totalCashDividend,
             totalCashFlow = totalCashFlow,
-            cashResetBalance = cashResetBalance
+            cashResetBalance = cashResetBalance,
+            realizedEvents = realizedEvents,
+            investmentFlows = investmentFlows
         )
     }
 
