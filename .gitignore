@@ -23,3 +23,14 @@ app/credentials.json
 
 # 個人用的功能規劃筆記
 /docs/新功能列表.md
+
+# 資產整合規劃與任務卡（含個人持倉數字，不公開）
+/docs/資產整合規劃.md
+/docs/任務卡.md
+/docs/任務卡/
+
+# Claude Code 本機指示
+CLAUDE.local.md
+
+# Claude Code 個人用 skill（依賴已忽略的任務卡）
+/.claude/skills/next-task/

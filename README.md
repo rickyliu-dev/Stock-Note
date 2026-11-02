@@ -14,7 +14,9 @@
 - **語言**:Kotlin
 - **UI**:Jetpack Compose
 - **架構**:MVVM
-- **本地資料庫**:Room
+- **本地資料庫**:Room(資料庫版本見 [docs/database-migrations.md](docs/database-migrations.md))
+- **依賴注入**:Hilt
+- **背景排程**:WorkManager
 - **網路請求**:OkHttp
 - **非同步處理**:Coroutines
 
