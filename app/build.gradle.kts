@@ -1,3 +1,4 @@
+import com.android.build.api.variant.ResValue
 import com.google.firebase.appdistribution.gradle.firebaseAppDistribution
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
@@ -61,7 +62,6 @@ android {
             signingConfig = signingConfigs.getByName("sharedDebug")
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
-            resValue("string", "app_name", "Stock (Debug)")
         }
         getByName("release") {
             // 指定使用上面定義的 release 金鑰
@@ -73,16 +73,29 @@ android {
                 "proguard-rules.pro"
             )
 
-            // Firebase App Distribution 配置
+            // Firebase App Distribution 配置（測試群組設在 basic flavor，只有 basicRelease 會發給家人）
             firebaseAppDistribution {
                 artifactType = "APK"
-                groups = "alpha-testers"
                 releaseNotes = "第三版 Release 測試"
 
                 // 讓 Gradle 直接讀取這份憑證，跳過所有登入步驟
                 serviceCredentialsFile = rootProject.file("app/credentials.json").absolutePath
             }
-            resValue("string", "app_name", "Stock")
+        }
+    }
+
+    // 3. 產品版本：personal（自己用，核心＋避險）、basic（只有核心）
+    flavorDimensions += "edition"
+    productFlavors {
+        create("personal") {
+            dimension = "edition"
+            applicationIdSuffix = ".personal"
+        }
+        create("basic") {
+            dimension = "edition"
+            firebaseAppDistribution {
+                groups = "alpha-testers"
+            }
         }
     }
     compileOptions {
@@ -118,6 +131,17 @@ android {
             excludes += "/META-INF/ASL2.0"
             excludes += "/META-INF/*.kotlin_module"
         }
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        val baseName = if (variant.flavorName == "personal") "Stock Pro" else "Stock"
+        val appName = if (variant.buildType == "debug") "$baseName (Debug)" else baseName
+        variant.resValues.put(
+            variant.makeResValueKey("string", "app_name"),
+            ResValue(appName, null)
+        )
     }
 }
 
