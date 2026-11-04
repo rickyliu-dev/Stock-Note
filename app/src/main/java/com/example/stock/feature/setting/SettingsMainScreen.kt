@@ -125,7 +125,7 @@ fun SettingsMainScreen(
     }
 
     val settingCategories = remember(isPremium) {
-        if (isPremium) {
+        val coreCategories = if (isPremium) {
             listOf(
                 SettingCategory.TaiwanStock,
                 SettingCategory.UsStock,
@@ -136,6 +136,8 @@ fun SettingsMainScreen(
                 SettingCategory.TaiwanStock
             )
         }
+        // 核心分類 ＋ flavor 提供的分類（basic 為空）
+        coreCategories.map { it.toItem() } + viewModel.settingsEntries.map { it.toItem() }
     }
 
     var expandedCategoryTitle by rememberSaveable { mutableStateOf<String?>(null) }

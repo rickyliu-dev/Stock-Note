@@ -11,7 +11,8 @@ fun NavGraphBuilder.homeGraph(
     onNavigateToDetail: (String) -> Unit,
     onNavigateToAdd: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToReport: () -> Unit
+    onNavigateToReport: () -> Unit,
+    onNavigateToFeature: (String) -> Unit
 ) {
     composable(route = AllScreens.Home.route) {
         HomeScreen(
@@ -19,7 +20,8 @@ fun NavGraphBuilder.homeGraph(
             onNavigateToDetail = onNavigateToDetail,
             onNavigateToAdd = onNavigateToAdd,
             onNavigateToSettings = onNavigateToSettings,
-            onNavigateToReport = onNavigateToReport
+            onNavigateToReport = onNavigateToReport,
+            onNavigateToFeature = onNavigateToFeature
         )
     }
 }

@@ -98,7 +98,8 @@ fun HomeScreen(
     onNavigateToDetail: (String) -> Unit,
     onNavigateToAdd: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToReport: () -> Unit
+    onNavigateToReport: () -> Unit,
+    onNavigateToFeature: (String) -> Unit
 ) {
     // 從 VM 觀察資料
     val assetDistribution by viewModel.assetDistribution.collectAsStateWithLifecycle()
@@ -310,6 +311,15 @@ fun HomeScreen(
                                 imageVector = Icons.Default.BarChart,
                                 contentDescription = "統計報表"
                             )
+                        }
+                        // flavor 提供的功能入口（basic 為空，不顯示任何東西）
+                        mainViewModel.featureEntries.forEach { entry ->
+                            IconButton(onClick = { onNavigateToFeature(entry.route) }) {
+                                Icon(
+                                    imageVector = entry.icon,
+                                    contentDescription = entry.title
+                                )
+                            }
                         }
                         IconButton(onClick = onNavigateToSettings) {
                             Icon(

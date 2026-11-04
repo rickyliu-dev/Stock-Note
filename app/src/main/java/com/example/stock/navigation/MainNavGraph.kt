@@ -40,8 +40,16 @@ fun MainNavGraph(
             },
             onNavigateToReport = {
                 navController.navigate(AllScreens.Report.route)
+            },
+            onNavigateToFeature = { route ->
+                navController.navigate(route)
             }
         )
+
+        // flavor 提供的功能（basic 為空集合）
+        mainViewModel.featureEntries.forEach { entry ->
+            with(entry) { register(navController) }
+        }
 
         // 統計報表
         reportGraph(
@@ -70,5 +78,10 @@ fun MainNavGraph(
             navController = navController,
             onBackClick = { navController.popBackStack() }
         )
+
+        // flavor 提供的設定分類（basic 為空集合）
+        mainViewModel.settingsEntries.forEach { entry ->
+            with(entry) { register(navController) }
+        }
     }
 }

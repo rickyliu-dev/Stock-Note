@@ -17,6 +17,7 @@ import com.example.stock.core.data.repository.TransactionRepository
 import com.example.stock.core.util.AutoBackupScheduler
 import com.example.stock.core.util.CsvManager
 import com.example.stock.core.util.GoogleDriveManager
+import com.example.stock.navigation.SettingsEntry
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -38,9 +39,13 @@ class SettingsViewModel @Inject constructor(
     private val googleDriveManager: GoogleDriveManager,
     private val autoBackupScheduler: AutoBackupScheduler,
     private val importExcelUseCase: com.example.stock.core.domain.ImportExcelUseCase,
-    private val importCsvUseCase: com.example.stock.core.domain.ImportCsvUseCase
+    private val importCsvUseCase: com.example.stock.core.domain.ImportCsvUseCase,
+    settingsEntries: Set<@JvmSuppressWildcards SettingsEntry>
 ) : ViewModel() {
     private var saveJob: Job? = null
+
+    // flavor 提供的設定分類；注入後不會再變，依標題排序讓顯示順序固定
+    val settingsEntries: List<SettingsEntry> = settingsEntries.sortedBy { it.title }
 
     // 畫面的狀態
     var feeRate by mutableStateOf(MarketConstants.Taiwan.DEFAULT_FEE_RATE)
