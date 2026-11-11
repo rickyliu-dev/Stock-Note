@@ -1,0 +1,55 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "b36a131ca13a28bd3331455a8746a4a5",
+    "entities": [
+      {
+        "tableName": "hedge_symbol_config",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accountId` INTEGER NOT NULL, `symbol` TEXT NOT NULL, `includeInExposure` INTEGER NOT NULL DEFAULT 0, `weightTimes100` INTEGER NOT NULL DEFAULT 100, PRIMARY KEY(`accountId`, `symbol`))",
+        "fields": [
+          {
+            "fieldPath": "accountId",
+            "columnName": "accountId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "symbol",
+            "columnName": "symbol",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "includeInExposure",
+            "columnName": "includeInExposure",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "weightTimes100",
+            "columnName": "weightTimes100",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "100"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "accountId",
+            "symbol"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b36a131ca13a28bd3331455a8746a4a5')"
+    ]
+  }
+}

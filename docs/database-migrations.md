@@ -1,6 +1,13 @@
 # 資料庫遷移規範
 
-目前資料庫版本：27（Room，schema 匯出在 `app/schemas/`）。
+本 App 有兩個 Room 資料庫，版本號各自獨立，schema 都匯出在 `app/schemas/` 並納入版控：
+
+| 資料庫 | 手機上的檔名 | 存在於 | 目前版本 |
+|---|---|---|---|
+| `StockDatabase`（核心） | `stock_database` | basic、personal | 27 |
+| `HedgeDatabase`（避險，`src/personal`） | `hedge_database` | 只有 personal | 1 |
+
+下面的規範兩個資料庫都適用。
 
 ## 為什麼要有這份規範
 這個 App 記錄的是使用者的交易資料，升級時不能悄悄遺失。
@@ -22,9 +29,22 @@
 - 不要在版本號不變的情況下改 Entity，現有資料庫的結構指紋（identityHash）會對不上。
 - 不要加回 `fallbackToDestructiveMigration()`（debug 版也不要）。
 
-## 版本紀錄
+## 版本紀錄：StockDatabase
 | DB 版本 | 說明 |
 |---|---|
 | 25 | 基準版本（更舊的版本沒有遷移路徑，不支援直接升級） |
 | 26 | transactions 新增 (accountId, symbol, date) 索引（AutoMigration） |
 | 27 | 新增 asset_snapshots 資產走勢表，主鍵 (accountId, date)，刪除帳戶時一併刪除（AutoMigration） |
+
+## HedgeDatabase
+
+- 程式碼：`app/src/personal/java/com/example/stock/core/data/hedge/HedgeDatabase.kt`，
+  schema：`app/schemas/com.example.stock.core.data.hedge.HedgeDatabase/`。
+- 從第一版就照本規範走：不使用 destructive migration、改 Entity 要升版並提供遷移。
+- 與 `StockDatabase` 之間無法建外鍵：`accountId` 對應核心 `accounts.id`，帳戶刪除時不會自動清除這裡的資料。
+- 雲端備份為 `hedge_ledger.personal.db`／`hedge_ledger.personal.debug.db`；還原時雲端缺少此檔不算失敗（舊備份沒有它）。
+
+### 版本紀錄：HedgeDatabase
+| DB 版本 | 說明 |
+|---|---|
+| 1 | 建立 hedge_symbol_config（避險標的設定），主鍵 (accountId, symbol)；includeInExposure 預設 false、weightTimes100 預設 100 |
