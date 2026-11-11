@@ -202,17 +202,19 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun restoreFromDrive(account: GoogleSignInAccount, onResult: (Boolean) -> Unit) {
+    /** onResult(是否成功, 可顯示給使用者的訊息) */
+    fun restoreFromDrive(account: GoogleSignInAccount, onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch {
             _isBackupLoading.value = true
-            val success = googleDriveManager.restoreDatabase(account)
+            val result = googleDriveManager.restoreDatabase(account)
+            val success = result is com.example.stock.core.util.RestoreResult.Success
             _isBackupLoading.value = false
-            
+
             if (success) {
                 android.util.Log.d("SettingsViewModel", "資料庫還原成功，UI 應已自動更新")
             }
 
-            onResult(success)
+            onResult(success, result.userMessage)
         }
     }
 

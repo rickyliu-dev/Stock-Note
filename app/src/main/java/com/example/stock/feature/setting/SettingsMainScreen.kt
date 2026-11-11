@@ -172,9 +172,8 @@ fun SettingsMainScreen(
         try {
             val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
             if (account != null) {
-                viewModel.restoreFromDrive(account) { success ->
-                    val msg = if (success) "還原成功，請重新啟動 App" else "還原失敗或找不到備份檔"
-                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                viewModel.restoreFromDrive(account) { _, message ->
+                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                 }
             }
         } catch (e: Exception) {

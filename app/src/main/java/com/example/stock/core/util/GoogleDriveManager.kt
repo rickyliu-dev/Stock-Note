@@ -26,10 +26,11 @@ import javax.inject.Singleton
 @Singleton
 class GoogleDriveManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val database: com.example.stock.dataBase.StockDatabase
+    private val backupTargets: Set<@JvmSuppressWildcards BackupTarget>
 ) {
     companion object {
-        private const val BACKUP_FILE_NAME = "stock_ledger.db"
+        private const val TAG = "GoogleDriveManager"
+        private const val RESTORE_TEMP_DIR = "restore_tmp"
     }
 
     private val googleSignInOptions = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -48,10 +49,10 @@ class GoogleDriveManager @Inject constructor(
         try {
             googleSignInClient.signOut()
             // 同時清除快取中的認證資訊
-            android.util.Log.d("GoogleDriveManager", "Google 帳號已成功登出")
+            android.util.Log.d(TAG, "Google 帳號已成功登出")
             true
         } catch (e: Exception) {
-            android.util.Log.e("GoogleDriveManager", "Google 登出失敗", e)
+            android.util.Log.e(TAG, "Google 登出失敗", e)
             false
         }
     }
@@ -69,40 +70,56 @@ class GoogleDriveManager @Inject constructor(
     }
 
     /**
-     * 搜尋並覆蓋 (Search-and-Update) 模式
-     * 確保 appDataFolder 永遠只有一個名為 stock_ledger.db 的檔案 ID
+     * 逐一備份所有 BackupTarget，任何一個失敗就回傳 false（其餘仍會嘗試備份）。
+     * 每個資料庫採搜尋並覆蓋 (Search-and-Update) 模式，
+     * 確保 appDataFolder 中每個 driveFileName 永遠只有一個檔案 ID。
      */
     suspend fun backupDatabase(account: GoogleSignInAccount): Boolean = withContext(Dispatchers.IO) {
-        val dbFile = context.getDatabasePath("stock_database")
-        val backupTempFile = File(context.cacheDir, "backup_ready.db")
+        val driveService = try {
+            getDriveService(account)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "建立 Drive 服務失敗", e)
+            return@withContext false
+        }
+        var allSucceeded = true
+        backupTargets.forEach { target ->
+            if (!backupOne(driveService, target)) allSucceeded = false
+        }
+        allSucceeded
+    }
+
+    private fun backupOne(driveService: Drive, target: BackupTarget): Boolean {
+        val dbFile = context.getDatabasePath(target.databaseName)
+        val backupTempFile = File(context.cacheDir, "backup_ready_${target.databaseName}.db")
+        val fileName = target.driveFileName
 
         try {
-            android.util.Log.d("GoogleDriveManager", "開始備份流程 (診斷模式)")
+            android.util.Log.d(TAG, "開始備份 ${target.databaseName} → $fileName (診斷模式)")
 
             val walFile = File(dbFile.absolutePath + "-wal")
             val shmFile = File(dbFile.absolutePath + "-shm")
-            
-            android.util.Log.d("GoogleDriveManager", "[本地診斷] 初始大小 - DB: ${dbFile.length()} bytes, WAL: ${walFile.length()} bytes, SHM: ${shmFile.length()} bytes")
+
+            android.util.Log.d(TAG, "[本地診斷] 初始大小 - DB: ${dbFile.length()} bytes, WAL: ${walFile.length()} bytes, SHM: ${shmFile.length()} bytes")
 
             // 1. 強制執行 Checkpoint 並檢查結果
             try {
-                val sdb = database.openHelper.writableDatabase
+                val sdb = target.database.openHelper.writableDatabase
                 val cursor = sdb.query("PRAGMA wal_checkpoint(TRUNCATE)")
                 if (cursor.moveToFirst()) {
                     val busy = cursor.getInt(0)
                     val log = cursor.getInt(1)
                     val checkpointed = cursor.getInt(2)
-                    android.util.Log.d("GoogleDriveManager", "[Checkpoint 詳情] Busy: $busy, Log Frames: $log, Checkpointed: $checkpointed")
+                    android.util.Log.d(TAG, "[Checkpoint 詳情] Busy: $busy, Log Frames: $log, Checkpointed: $checkpointed")
                 }
                 cursor.close()
             } catch (e: Exception) {
-                android.util.Log.e("GoogleDriveManager", "Checkpoint 執行異常: ${e.message}")
+                android.util.Log.e(TAG, "Checkpoint 執行異常: ${e.message}")
             }
 
-            android.util.Log.d("GoogleDriveManager", "[本地診斷] Checkpoint 後大小 - DB: ${dbFile.length()} bytes, WAL: ${walFile.length()} bytes")
+            android.util.Log.d(TAG, "[本地診斷] Checkpoint 後大小 - DB: ${dbFile.length()} bytes, WAL: ${walFile.length()} bytes")
 
             if (!dbFile.exists() || dbFile.length() <= 4096L) {
-                android.util.Log.w("GoogleDriveManager", "警告：資料庫檔案過小 (${dbFile.length()} bytes)，可能未包含實際資料")
+                android.util.Log.w(TAG, "警告：資料庫檔案過小 (${dbFile.length()} bytes)，可能未包含實際資料")
             }
 
             // 2. 建立本地快照
@@ -114,12 +131,10 @@ class GoogleDriveManager @Inject constructor(
                 }
             }
 
-            val driveService = getDriveService(account)
-
             // 3. 搜尋現有檔案
             val listResult = driveService.files().list()
                 .setSpaces("appDataFolder")
-                .setQ("name = '$BACKUP_FILE_NAME' and trashed = false")
+                .setQ("name = '$fileName' and trashed = false")
                 .setFields("files(id, name, size)")
                 .execute()
 
@@ -129,122 +144,125 @@ class GoogleDriveManager @Inject constructor(
 
             if (existingFile != null) {
                 // 路徑 A：檔案已存在，執行覆蓋上傳 (Update)
-                android.util.Log.d("GoogleDriveManager", "[G-Drive] Current Target File ID: ${existingFile.id} (執行更新, 大小: %.2f KB)".format(fileSizeInKb))
+                android.util.Log.d(TAG, "[G-Drive] Current Target File ID: ${existingFile.id} (執行更新, 大小: %.2f KB)".format(fileSizeInKb))
                 driveService.files().update(existingFile.id, null, mediaContent).execute()
-                
+
                 // 清除可能重複的同名檔案 (防呆)
                 if ((listResult.files?.size ?: 0) > 1) {
                     listResult.files.drop(1).forEach { extraFile ->
                         try {
                             driveService.files().delete(extraFile.id).execute()
-                            android.util.Log.d("GoogleDriveManager", "已清理重複的備份檔: ${extraFile.id}")
+                            android.util.Log.d(TAG, "已清理重複的備份檔: ${extraFile.id}")
                         } catch (e: Exception) { /* ignore */ }
                     }
                 }
             } else {
                 // 路徑 B：檔案不存在，執行新建 (Create)
-                android.util.Log.d("GoogleDriveManager", "雲端查無備份，執行新建 (大小: %.2f KB)...".format(fileSizeInKb))
+                android.util.Log.d(TAG, "雲端查無備份 $fileName，執行新建 (大小: %.2f KB)...".format(fileSizeInKb))
                 val fileMetadata = com.google.api.services.drive.model.File().apply {
-                    name = BACKUP_FILE_NAME
+                    name = fileName
                     parents = listOf("appDataFolder")
                 }
                 val uploadedFile = driveService.files().create(fileMetadata, mediaContent)
                     .setFields("id")
                     .execute()
-                android.util.Log.d("GoogleDriveManager", "[G-Drive] New Target File ID: ${uploadedFile.id}")
+                android.util.Log.d(TAG, "[G-Drive] New Target File ID: ${uploadedFile.id}")
             }
 
             // 4. 強制同步確認 (讀取最新修改時間)
             val updatedFile = driveService.files().list()
                 .setSpaces("appDataFolder")
-                .setQ("name = '$BACKUP_FILE_NAME' and trashed = false")
+                .setQ("name = '$fileName' and trashed = false")
                 .setFields("files(id, modifiedTime, size)")
                 .execute()
                 .files?.firstOrNull()
 
             val updatedSizeInKb = (updatedFile?.getSize() ?: 0L) / 1024.0
-            android.util.Log.d("GoogleDriveManager", "備份成功。雲端最後修改時間: ${updatedFile?.modifiedTime}, 雲端檔案大小: %.2f KB".format(updatedSizeInKb))
-            true
+            android.util.Log.d(TAG, "備份成功 $fileName。雲端最後修改時間: ${updatedFile?.modifiedTime}, 雲端檔案大小: %.2f KB".format(updatedSizeInKb))
+            return true
         } catch (e: Exception) {
-            android.util.Log.e("GoogleDriveManager", "備份異常", e)
-            false
+            android.util.Log.e(TAG, "備份異常 ($fileName)", e)
+            return false
         } finally {
             if (backupTempFile.exists()) backupTempFile.delete()
         }
     }
 
     /**
-     * ID 精確比對還原模式
+     * 還原所有 BackupTarget：全部先下載到暫存資料夾 → RestorePlanner 全部檢查通過 → 才開始覆蓋。
+     * 只找自己變體的 driveFileName；找不到不會退回去讀其他檔名。
+     * 成功時會重啟 App 進程。
      */
-    suspend fun restoreDatabase(account: GoogleSignInAccount): Boolean = withContext(Dispatchers.IO) {
-        val tempFile = File(context.cacheDir, "temp_restore.db")
-        val dbFile = context.getDatabasePath("stock_database")
+    suspend fun restoreDatabase(account: GoogleSignInAccount): RestoreResult = withContext(Dispatchers.IO) {
+        val tempDir = File(context.cacheDir, RESTORE_TEMP_DIR)
         try {
+            tempDir.deleteRecursively()
+            tempDir.mkdirs()
+
             val driveService = getDriveService(account)
-            
-            // 1. 搜尋並取得最新備份
-            val listResult = driveService.files().list()
-                .setSpaces("appDataFolder")
-                .setQ("name = '$BACKUP_FILE_NAME' and trashed = false")
-                .setOrderBy("modifiedTime desc")
-                .setPageSize(1)
-                .setFields("files(id, name, size, modifiedTime)")
-                .execute()
 
-            val driveFile = listResult.files?.firstOrNull()
-
-            if (driveFile == null) {
-                android.util.Log.e("GoogleDriveManager", "雲端找不到備份檔案 ($BACKUP_FILE_NAME)")
-                return@withContext false
+            // 1. 全部下載到暫存資料夾（雲端沒有的檔案 downloaded = null）
+            val items = backupTargets.map { target ->
+                RestoreItem(
+                    fileName = target.driveFileName,
+                    downloaded = download(driveService, target.driveFileName, File(tempDir, target.driveFileName)),
+                    localDbFile = context.getDatabasePath(target.databaseName),
+                    currentVersion = target.database.openHelper.readableDatabase.version,
+                    required = target.required
+                )
             }
 
-            android.util.Log.d("GoogleDriveManager", "[G-Drive] Selected Restore File ID: ${driveFile.id}, Date: ${driveFile.modifiedTime}, Size: ${driveFile.size}")
-
-            // 2. 下載到暫存區
-            FileOutputStream(tempFile).use { outputStream ->
-                driveService.files().get(driveFile.id).executeMediaAndDownloadTo(outputStream)
-                outputStream.flush()
-                outputStream.channel.force(true)
+            // 2. 全部檢查通過才關閉資料庫並覆蓋
+            val result = RestorePlanner.restore(items) {
+                backupTargets.forEach { it.database.close() }
             }
 
-            if (tempFile.length() == 0L) throw Exception("下載檔案為空")
-
-            // 3. 本地環境淨化：物理刪除 .db, -wal, -shm
-            database.close()
-            
-            val walFile = File(dbFile.absolutePath + "-wal")
-            val shmFile = File(dbFile.absolutePath + "-shm")
-            
-            listOf(dbFile, walFile, shmFile).forEach { file ->
-                if (file.exists()) {
-                    val deleted = file.delete()
-                    android.util.Log.d("GoogleDriveManager", "本地淨化: ${file.name}, 成功: $deleted")
-                }
+            if (result !is RestoreResult.Success) {
+                android.util.Log.e(TAG, "還原中止，本機未變更: $result")
+                return@withContext result
             }
 
-            // 4. 覆蓋本地資料庫
-            java.io.FileInputStream(tempFile).use { input ->
-                FileOutputStream(dbFile).use { output ->
-                    input.channel.transferTo(0, input.channel.size(), output.channel)
-                    output.flush()
-                    output.channel.force(true)
-                }
-            }
-
-            android.util.Log.d("GoogleDriveManager", "資料庫替換完成，準備重啟進程")
+            android.util.Log.d(TAG, "資料庫替換完成，準備重啟進程")
 
             withContext(Dispatchers.Main) {
-                Toast.makeText(context, "還原成功，正在重啟...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, result.userMessage, Toast.LENGTH_SHORT).show()
                 delay(500)
                 triggerRestart()
             }
-            true
+            result
         } catch (e: Exception) {
-            android.util.Log.e("GoogleDriveManager", "還原異常", e)
-            false
+            android.util.Log.e(TAG, "還原異常", e)
+            RestoreResult.Failed(e.message ?: e.javaClass.simpleName)
         } finally {
-            if (tempFile.exists()) tempFile.delete()
+            tempDir.deleteRecursively()
         }
+    }
+
+    /** 下載 appDataFolder 中最新的同名檔；雲端沒有此檔回傳 null */
+    private fun download(driveService: Drive, fileName: String, dest: File): File? {
+        val driveFile = driveService.files().list()
+            .setSpaces("appDataFolder")
+            .setQ("name = '$fileName' and trashed = false")
+            .setOrderBy("modifiedTime desc")
+            .setPageSize(1)
+            .setFields("files(id, name, size, modifiedTime)")
+            .execute()
+            .files?.firstOrNull()
+
+        if (driveFile == null) {
+            android.util.Log.w(TAG, "雲端找不到備份檔案 ($fileName)")
+            return null
+        }
+
+        android.util.Log.d(TAG, "[G-Drive] Selected Restore File ID: ${driveFile.id}, Name: $fileName, Date: ${driveFile.modifiedTime}, Size: ${driveFile.size}")
+
+        FileOutputStream(dest).use { outputStream ->
+            driveService.files().get(driveFile.id).executeMediaAndDownloadTo(outputStream)
+            outputStream.flush()
+            outputStream.channel.force(true)
+        }
+        if (dest.length() == 0L) throw Exception("下載檔案為空 ($fileName)")
+        return dest
     }
 
     private fun triggerRestart() {
