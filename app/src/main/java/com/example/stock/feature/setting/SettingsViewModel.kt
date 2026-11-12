@@ -17,6 +17,8 @@ import com.example.stock.core.data.repository.TransactionRepository
 import com.example.stock.core.util.AutoBackupScheduler
 import com.example.stock.core.util.CsvManager
 import com.example.stock.core.util.GoogleDriveManager
+import com.example.stock.core.util.LocalBackupManager
+import com.example.stock.core.util.RestoreResult
 import com.example.stock.navigation.SettingsEntry
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -37,6 +39,7 @@ class SettingsViewModel @Inject constructor(
     private val repository: SettingsRepository,
     private val transactionRepository: TransactionRepository,
     private val googleDriveManager: GoogleDriveManager,
+    private val localBackupManager: LocalBackupManager,
     private val autoBackupScheduler: AutoBackupScheduler,
     private val importExcelUseCase: com.example.stock.core.domain.ImportExcelUseCase,
     private val importCsvUseCase: com.example.stock.core.domain.ImportCsvUseCase,
@@ -55,12 +58,6 @@ class SettingsViewModel @Inject constructor(
 
     private val _dashboardSettings = MutableStateFlow<List<DashboardSettingItem>>(emptyList())
     val dashboardSettings = _dashboardSettings.asStateFlow()
-
-    val isPremiumUnlocked = repository.isPremiumUnlockedFlow.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = false
-    )
 
     val lastUpdateTimestampFlow = repository.lastUpdateTimestampFlow
 
@@ -215,6 +212,29 @@ class SettingsViewModel @Inject constructor(
             }
 
             onResult(success, result.userMessage)
+        }
+    }
+
+    // --- 本地備份（存成 zip 到自選位置，不需登入） ---
+    private val _isLocalBackupLoading = MutableStateFlow(false)
+    val isLocalBackupLoading = _isLocalBackupLoading.asStateFlow()
+
+    fun backupToFile(uri: Uri, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            _isLocalBackupLoading.value = true
+            val success = localBackupManager.backupTo(uri)
+            _isLocalBackupLoading.value = false
+            onResult(success)
+        }
+    }
+
+    /** onResult(是否成功, 可顯示給使用者的訊息)；成功時 App 會重啟 */
+    fun restoreFromFile(uri: Uri, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            _isLocalBackupLoading.value = true
+            val result = localBackupManager.restoreFrom(uri)
+            _isLocalBackupLoading.value = false
+            onResult(result is RestoreResult.Success, result.userMessage)
         }
     }
 

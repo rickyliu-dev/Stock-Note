@@ -12,6 +12,8 @@ import com.example.stock.core.data.DateProvider
 import com.example.stock.core.data.EnterConstants
 import com.example.stock.core.data.MarketConstants
 import com.example.stock.core.data.model.Account
+import com.example.stock.core.data.model.MarketAvailability
+import com.example.stock.core.data.model.SearchRegion
 import com.example.stock.core.data.model.TransactionItem
 import com.example.stock.core.data.model.TransactionType
 import com.example.stock.core.data.repository.SettingsRepository
@@ -62,6 +64,7 @@ class AddTransactionViewModel @Inject constructor(
     private val repository: TransactionRepository,
     private val settingsRepository: SettingsRepository,
     private val stockRepository: StockRepository,
+    marketAvailability: MarketAvailability,
     private val calculateTransactionUseCase: CalculateTransactionUseCase,
     private val dateProvider: DateProvider,
     savedStateHandle: SavedStateHandle
@@ -77,7 +80,11 @@ class AddTransactionViewModel @Inject constructor(
     private val initialName: String? = savedStateHandle.get<String>(AllScreens.ARG_NAME)
         .let { if (it == NAV_ARG_NONE || it == NAV_ARG_NULL) null else it }
     private var searchJob: Job? = null
-    
+
+    // 允許混合搜尋（personal）就用 ALL，否則只搜台股（basic）；切換畫面見雜項 6
+    private val searchRegion: SearchRegion =
+        if (SearchRegion.ALL in marketAvailability.searchRegions) SearchRegion.ALL else SearchRegion.TW
+
     val transactionId: Long = savedStateHandle.get<Long>(AllScreens.TRANSACTIONS_ID) 
         ?: savedStateHandle.get<String>(AllScreens.TRANSACTIONS_ID)?.toLongOrNull() 
         ?: -1L
@@ -176,14 +183,14 @@ class AddTransactionViewModel @Inject constructor(
                 return@launch
             }
             delay(EnterConstants.DEBOUNCE_DELAY)
-            val results = stockRepository.searchStocks(newSymbol)
+            val results = stockRepository.searchStocks(newSymbol, searchRegion)
             uiState = uiState.copy(searchResults = results)
         }
     }
 
     private fun fetchNameForSymbol(query: String) {
         viewModelScope.launch {
-            val results = stockRepository.searchStocks(query)
+            val results = stockRepository.searchStocks(query, searchRegion)
             val match = results.find { it.first == query } ?: results.firstOrNull()
             if (match != null) {
                 uiState = uiState.copy(name = match.second)

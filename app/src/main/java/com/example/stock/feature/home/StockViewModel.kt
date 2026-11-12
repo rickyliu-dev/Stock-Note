@@ -434,20 +434,6 @@ class StockViewModel @Inject constructor(
             toastMessage.emit("已將 ${symbols.size} 支股票移動至目標帳戶")
         }
     }
-
-    fun verifyAndUnlock(code: String): Boolean {
-        if (code == "8888") {
-            viewModelScope.launch {
-                toastMessage.emit("解鎖成功！")
-            }
-            return true
-        } else {
-            viewModelScope.launch {
-                toastMessage.emit("驗證碼錯誤")
-            }
-            return false
-        }
-    }
 }
 
 data class HomeUiState(

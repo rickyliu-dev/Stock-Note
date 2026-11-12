@@ -30,8 +30,12 @@ sealed interface RestoreResult {
         override val userMessage = "還原成功，正在重啟..."
     }
 
-    data class MissingRequired(val fileName: String) : RestoreResult {
-        override val userMessage = "雲端找不到備份檔（$fileName）"
+    /** source 由呼叫端標明（RestorePlanner 不知道來源，預設 FILE；雲端還原改成 CLOUD） */
+    data class MissingRequired(val fileName: String, val source: BackupSource = BackupSource.FILE) : RestoreResult {
+        override val userMessage = when (source) {
+            BackupSource.CLOUD -> "雲端找不到這個版本的備份檔（$fileName）"
+            BackupSource.FILE -> "備份檔中找不到必要的檔案（$fileName）"
+        }
     }
 
     data class NewerVersion(val fileName: String, val backupVersion: Int, val appVersion: Int) : RestoreResult {
@@ -50,8 +54,8 @@ sealed interface RestoreResult {
 /**
  * 還原的「檢查與覆蓋」，不依賴 Android 與 Drive，方便單元測試。
  *
- * 流程：全部檢查通過 → 呼叫 beforeOverwrite（關閉資料庫）→ 逐一覆蓋。
- * 任何一項檢查失敗，本機檔案完全不動。
+ * 流程：全部檢查通過 → 暫存 → 提交 → 呼叫 beforeOverwrite（關閉資料庫）→ 換檔（見 [RestoreRecovery]）。
+ * 任何一項檢查或暫存失敗，本機檔案完全不動。
  */
 object RestorePlanner {
 
@@ -59,12 +63,50 @@ object RestorePlanner {
     private const val USER_VERSION_OFFSET = 60L
     private val SQLITE_MAGIC = "SQLite format 3\u0000".toByteArray(Charsets.US_ASCII)
 
-    fun restore(items: Collection<RestoreItem>, beforeOverwrite: () -> Unit): RestoreResult {
+    /**
+     * 全部檢查通過後：暫存 → 提交 → 呼叫 beforeOverwrite（關閉資料庫）→ 換檔 → 刪除標記。
+     * 結果只會是「全部舊」或「全部新」；中斷時由 [RestoreRecovery.recover] 在下次啟動收尾。
+     * 所有資料庫檔必須在同一個資料夾（context.getDatabasePath 的結果都是）。
+     */
+    fun restore(items: Collection<RestoreItem>, beforeOverwrite: () -> Unit): RestoreResult =
+        restore(items, ::copyWithSync, beforeOverwrite)
+
+    /** stageCopy 可替換，讓單元測試模擬暫存階段寫檔失敗 */
+    internal fun restore(
+        items: Collection<RestoreItem>,
+        stageCopy: (source: File, dest: File) -> Unit,
+        beforeOverwrite: () -> Unit
+    ): RestoreResult {
         check(items)?.let { return it }
 
+        val toRestore = items.filter { it.downloaded != null }
+        val dir = (toRestore.firstOrNull() ?: items.firstOrNull())?.localDbFile?.parentFile
+            ?: return RestoreResult.Failed("沒有要還原的資料庫")
+        require(toRestore.all { it.localDbFile.parentFile == dir }) { "所有資料庫檔必須在同一個資料夾" }
+
+        // 1. 暫存：失敗就刪掉暫存檔，資料庫不關、本機完全不動
+        val staged = mutableListOf<File>()
+        try {
+            toRestore.forEach { item ->
+                val staging = RestoreRecovery.stagingFileFor(item.localDbFile)
+                staged += staging
+                stageCopy(item.downloaded!!, staging)
+            }
+            // 2. 提交：rename 成功之後就一定要換完
+            RestoreRecovery.commit(dir, toRestore.map { it.localDbFile.name })
+        } catch (e: Exception) {
+            staged.forEach { it.delete() }
+            return RestoreResult.Failed("寫入暫存檔失敗（${e.message ?: e.javaClass.simpleName}），本機資料未變更")
+        }
+
+        // 3. 換檔 4. 刪除標記
         beforeOverwrite()
-        items.filter { it.downloaded != null }.forEach { overwrite(it.downloaded!!, it.localDbFile) }
-        return RestoreResult.Success
+        return try {
+            RestoreRecovery.recover(dir)
+            RestoreResult.Success
+        } catch (e: Exception) {
+            RestoreResult.Failed("換檔未完成，請重新開啟 App，會自動完成還原")
+        }
     }
 
     /** 回傳第一個失敗原因；全部通過回傳 null */
@@ -96,13 +138,10 @@ object RestorePlanner {
         }
     }
 
-    /** 沿用原本做法：刪除 .db、-wal、-shm，再複製備份檔 */
-    private fun overwrite(source: File, dbFile: File) {
-        listOf(dbFile, File(dbFile.path + "-wal"), File(dbFile.path + "-shm")).forEach { file ->
-            if (file.exists()) file.delete()
-        }
+    /** 複製並 fsync，確保暫存檔真的寫進儲存裝置 */
+    private fun copyWithSync(source: File, dest: File) {
         FileInputStream(source).use { input ->
-            FileOutputStream(dbFile).use { output ->
+            FileOutputStream(dest).use { output ->
                 input.channel.transferTo(0, input.channel.size(), output.channel)
                 output.flush()
                 output.channel.force(true)

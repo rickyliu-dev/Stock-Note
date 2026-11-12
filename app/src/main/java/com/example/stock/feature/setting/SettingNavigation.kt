@@ -4,7 +4,6 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
-import com.example.stock.core.ui.component.screen.PlaceholderScreen
 import com.example.stock.feature.setting.twStock.DashboardSortingScreen
 import com.example.stock.feature.setting.twStock.TaiwanStockSettingsScreen
 import com.example.stock.navigation.AllScreens
@@ -54,34 +53,6 @@ fun NavGraphBuilder.settingsGraph(
             )
         }
 
-        // 美股設定 (佔位)
-        composable(route = AllScreens.SettingsUs.Fees.route) {
-            PlaceholderScreen(
-                title = "美股設定",
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(route = AllScreens.SettingsUs.Sorting.route) {
-            PlaceholderScreen(
-                title = "美股設定",
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        // 虛擬貨幣設定 (佔位)
-        composable(route = AllScreens.SettingsCrypto.Fees.route) {
-            PlaceholderScreen(
-                title = "虛擬貨幣設定",
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(route = AllScreens.SettingsCrypto.Sorting.route) {
-            PlaceholderScreen(
-                title = "虛擬貨幣設定",
-                onBack = { navController.popBackStack() }
-            )
-        }
+        // 美股、虛擬貨幣設定只在 personal，由 SettingsEntry 註冊路由（見 MainNavGraph）
     }
 }

@@ -1,5 +1,6 @@
 package com.example.stock.core.data.repository
 
+import com.example.stock.core.data.model.MarketAvailability
 import com.example.stock.core.data.model.StockDetail
 import com.example.stock.core.data.model.SearchRegion
 import com.example.stock.core.data.source.TwStockCacheData
@@ -51,8 +52,17 @@ class StockRepositoryImplTest {
         every { yahoo.search(any()) } returns emptyList()
         every { yahoo.fetchQuote(any()) } returns StockDetail(100.0, 1.0, 1.0)
 
-        repo = StockRepositoryImpl(twLocal, twRemote, yahoo)
+        repo = StockRepositoryImpl(twLocal, twRemote, yahoo, allRegions)
     }
+
+    private fun availability(vararg regions: SearchRegion) = object : MarketAvailability {
+        override val searchRegions = regions.toSet()
+    }
+
+    // 既有測試沿用「全部地區都允許」（等同 personal）
+    private val allRegions = availability(SearchRegion.TW, SearchRegion.US, SearchRegion.ALL)
+    private fun twOnlyRepo() =
+        StockRepositoryImpl(twLocal, twRemote, yahoo, availability(SearchRegion.TW))
 
     private fun codes(result: List<Pair<String, String>>) = result.map { it.first }
 
@@ -147,6 +157,39 @@ class StockRepositoryImplTest {
                 (1..6).associate { "100$it" to "測試$it" }
         repo.searchStocks("100", SearchRegion.ALL)
         verify(exactly = 0) { yahoo.search(any()) }
+    }
+
+    // ---------- 允許的地區（MarketAvailability） ----------
+
+    @Test
+    fun `只允許 TW 時以 ALL 搜尋 AAPL，不呼叫美股資料來源且回傳空結果`() = runTest {
+        every { yahoo.search("AAPL") } returns listOf("AAPL" to "Apple")
+        val result = twOnlyRepo().searchStocks("AAPL", SearchRegion.ALL)
+        assertTrue(result.isEmpty())
+        verify(exactly = 0) { yahoo.search(any()) }
+    }
+
+    @Test
+    fun `只允許 TW 時以 US 搜尋，不呼叫任何資料來源且回傳空結果`() = runTest {
+        every { yahoo.search("AAPL") } returns listOf("AAPL" to "Apple")
+        val result = twOnlyRepo().searchStocks("AAPL", SearchRegion.US)
+        assertTrue(result.isEmpty())
+        verify(exactly = 0) { yahoo.search(any()) }
+        verify(exactly = 0) { twRemote.fetchTwseListed() }
+    }
+
+    @Test
+    fun `只允許 TW 時以 ALL 搜尋仍可找到台股`() = runTest {
+        val result = twOnlyRepo().searchStocks("2330", SearchRegion.ALL)
+        assertEquals(listOf("2330.TW"), codes(result))
+        verify(exactly = 0) { yahoo.search(any()) }
+    }
+
+    @Test
+    fun `允許 ALL 時搜尋 AAPL 會查 Yahoo`() = runTest {
+        every { yahoo.search("AAPL") } returns listOf("AAPL" to "Apple")
+        val result = repo.searchStocks("AAPL", SearchRegion.ALL)
+        assertEquals(listOf("AAPL" to "Apple"), result)
     }
 
     // ---------- 查詢報價：Yahoo 代號判斷 ----------

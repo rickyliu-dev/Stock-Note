@@ -2,8 +2,6 @@ package com.example.stock.feature.setting
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShowChart
-import androidx.compose.material.icons.filled.CurrencyBitcoin
-import androidx.compose.material.icons.filled.Public
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.stock.navigation.AllScreens
 
@@ -22,21 +20,5 @@ sealed class SettingCategory(
         )
     )
 
-    object UsStock : SettingCategory(
-        title = "美股設定",
-        icon = Icons.Default.Public,
-        subItems = listOf(
-            SubSetting("自訂儀表板版面", AllScreens.SettingsUs.Sorting.route),
-            SubSetting("交易稅設定", AllScreens.SettingsUs.Fees.route)
-        )
-    )
-
-    object Crypto : SettingCategory(
-        title = "虛擬貨幣設定",
-        icon = Icons.Default.CurrencyBitcoin,
-        subItems = listOf(
-            SubSetting("自訂儀表板版面", AllScreens.SettingsUs.Sorting.route),
-            SubSetting("Gas Fee 設定", AllScreens.SettingsCrypto.Fees.route)
-        )
-    )
+    // 美股、虛擬貨幣設定只在 personal，由 SettingsEntry 提供（見 src/personal）
 }

@@ -25,18 +25,7 @@ sealed class AllScreens(val route: String) {
         // 未來擴充： object Tax : SettingsTw("settings_tw_tax")
     }
 
-    // --- 美股群組 ---
-    sealed class SettingsUs(route: String) : AllScreens(route) {
-        object Sorting : SettingsUs("settings_us_sorting")
-        object Fees : SettingsUs("settings_us_fees")
-    }
-
-    // --- 虛擬貨幣群組 ---
-    sealed class SettingsCrypto(route: String) : AllScreens(route) {
-        object Sorting : SettingsCrypto("settings_crypto_sorting")
-        object Fees : SettingsCrypto("settings_crypto_fees")
-        // 未來擴充： object Wallet : SettingsCrypto("settings_crypto_wallet")
-    }
+    // 美股、虛擬貨幣設定的路由在 src/personal 的 SettingsEntry 裡
 
     companion object {
         const val ARG_SYMBOL = "symbol"

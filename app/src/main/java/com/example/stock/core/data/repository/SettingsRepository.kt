@@ -21,9 +21,6 @@ interface SettingsRepository {
     val currentAccountIdFlow: Flow<Long>
     suspend fun setCurrentAccountId(id: Long)
 
-    val isPremiumUnlockedFlow: Flow<Boolean>
-    suspend fun unlockPremium()
-
     val twSettingsFlow: Flow<TwSettings>
     suspend fun saveTwSettings(feeRate: String, discount: String, minFee: String, enabled: Boolean)
 

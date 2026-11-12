@@ -19,6 +19,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.AlertDialog
@@ -57,6 +59,9 @@ import com.example.stock.core.data.LicenseManager
 import com.example.stock.core.ui.theme.SettingHeader
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,11 +70,32 @@ fun SettingsMainScreen(
     onBack: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
-    val isPremium by viewModel.isPremiumUnlocked.collectAsState()
     val compactTransactionCard by viewModel.compactTransactionCard.collectAsState()
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // --- 本地備份：存 zip 到自選位置／從 zip 還原 ---
+    val isLocalBackupLoading by viewModel.isLocalBackupLoading.collectAsState()
+    val localBackupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri: Uri? ->
+        uri?.let {
+            viewModel.backupToFile(it) { success ->
+                Toast.makeText(context, if (success) "本地備份成功" else "本地備份失敗", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    val localRestoreLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let {
+            viewModel.restoreFromFile(it) { success, message ->
+                // 成功時 LocalBackupManager 會自己顯示訊息並重啟
+                if (!success) Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     // --- 匯入 CSV 的 Launcher ---
     val importLauncher = rememberLauncherForActivityResult(
@@ -124,18 +150,8 @@ fun SettingsMainScreen(
         }
     }
 
-    val settingCategories = remember(isPremium) {
-        val coreCategories = if (isPremium) {
-            listOf(
-                SettingCategory.TaiwanStock,
-                SettingCategory.UsStock,
-                SettingCategory.Crypto
-            )
-        } else {
-            listOf(
-                SettingCategory.TaiwanStock
-            )
-        }
+    val settingCategories = remember {
+        val coreCategories = listOf(SettingCategory.TaiwanStock)
         // 核心分類 ＋ flavor 提供的分類（basic 為空）
         coreCategories.map { it.toItem() } + viewModel.settingsEntries.map { it.toItem() }
     }
@@ -333,6 +349,44 @@ fun SettingsMainScreen(
                         ) 
                     },
                     modifier = Modifier.clickable { onNavigate(com.example.stock.navigation.AllScreens.CloudBackup.route) }
+                )
+            }
+
+            item {
+                SettingHeader(
+                    text = "本地備份",
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                )
+                ListItem(
+                    headlineContent = { Text("備份到檔案") },
+                    supportingContent = {
+                        Text(if (isLocalBackupLoading) "處理中，請稍候..." else "存成 zip，可選手機、雲端硬碟資料夾或隨身碟；不需登入")
+                    },
+                    leadingContent = {
+                        Icon(
+                            imageVector = Icons.Default.SaveAlt,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    modifier = Modifier.clickable(enabled = !isLocalBackupLoading) {
+                        val time = SimpleDateFormat("yyyyMMdd-HHmm", Locale.getDefault()).format(Date())
+                        localBackupLauncher.launch("stock-note-backup-$time.zip")
+                    }
+                )
+                ListItem(
+                    headlineContent = { Text("從檔案還原") },
+                    supportingContent = { Text("會覆蓋目前手機上的所有資料，並自動重啟 App") },
+                    leadingContent = {
+                        Icon(
+                            imageVector = Icons.Default.Restore,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    modifier = Modifier.clickable(enabled = !isLocalBackupLoading) {
+                        localRestoreLauncher.launch(arrayOf("application/zip", "application/octet-stream"))
+                    }
                 )
             }
 

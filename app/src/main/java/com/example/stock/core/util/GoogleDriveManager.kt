@@ -102,19 +102,7 @@ class GoogleDriveManager @Inject constructor(
             android.util.Log.d(TAG, "[本地診斷] 初始大小 - DB: ${dbFile.length()} bytes, WAL: ${walFile.length()} bytes, SHM: ${shmFile.length()} bytes")
 
             // 1. 強制執行 Checkpoint 並檢查結果
-            try {
-                val sdb = target.database.openHelper.writableDatabase
-                val cursor = sdb.query("PRAGMA wal_checkpoint(TRUNCATE)")
-                if (cursor.moveToFirst()) {
-                    val busy = cursor.getInt(0)
-                    val log = cursor.getInt(1)
-                    val checkpointed = cursor.getInt(2)
-                    android.util.Log.d(TAG, "[Checkpoint 詳情] Busy: $busy, Log Frames: $log, Checkpointed: $checkpointed")
-                }
-                cursor.close()
-            } catch (e: Exception) {
-                android.util.Log.e(TAG, "Checkpoint 執行異常: ${e.message}")
-            }
+            DatabaseSnapshot.checkpoint(target.database)
 
             android.util.Log.d(TAG, "[本地診斷] Checkpoint 後大小 - DB: ${dbFile.length()} bytes, WAL: ${walFile.length()} bytes")
 
@@ -123,13 +111,7 @@ class GoogleDriveManager @Inject constructor(
             }
 
             // 2. 建立本地快照
-            java.io.FileInputStream(dbFile).use { input ->
-                FileOutputStream(backupTempFile).use { output ->
-                    input.channel.transferTo(0, input.channel.size(), output.channel)
-                    output.flush()
-                    output.channel.force(true)
-                }
-            }
+            DatabaseSnapshot.copy(dbFile, backupTempFile)
 
             // 3. 搜尋現有檔案
             val listResult = driveService.files().list()
@@ -215,7 +197,7 @@ class GoogleDriveManager @Inject constructor(
             // 2. 全部檢查通過才關閉資料庫並覆蓋
             val result = RestorePlanner.restore(items) {
                 backupTargets.forEach { it.database.close() }
-            }
+            }.let { if (it is RestoreResult.MissingRequired) it.copy(source = BackupSource.CLOUD) else it }
 
             if (result !is RestoreResult.Success) {
                 android.util.Log.e(TAG, "還原中止，本機未變更: $result")
@@ -227,7 +209,7 @@ class GoogleDriveManager @Inject constructor(
             withContext(Dispatchers.Main) {
                 Toast.makeText(context, result.userMessage, Toast.LENGTH_SHORT).show()
                 delay(500)
-                triggerRestart()
+                AppRestarter.restart(context)
             }
             result
         } catch (e: Exception) {
@@ -263,15 +245,5 @@ class GoogleDriveManager @Inject constructor(
         }
         if (dest.length() == 0L) throw Exception("下載檔案為空 ($fileName)")
         return dest
-    }
-
-    private fun triggerRestart() {
-        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-        if (intent != null) {
-            val restartIntent = Intent.makeRestartActivityTask(intent.component)
-            context.startActivity(restartIntent)
-        }
-        // 徹底殺死進程，確保 Hilt 單例重新建構
-        Runtime.getRuntime().exit(0)
     }
 }

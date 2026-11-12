@@ -35,7 +35,6 @@ class SettingsRepositoryImpl @Inject constructor(
         val TW_MIN_FEE = stringPreferencesKey("tw_min_fee")
         val SHOW_PRE_DEDUCT_COST = booleanPreferencesKey("show_pre_deduct_cost")
         val DASHBOARD_SETTINGS = stringPreferencesKey("dashboard_settings_json")
-        val IS_PREMIUM_UNLOCKED = booleanPreferencesKey("is_premium_unlocked")
         val INCLUDE_DIVIDENDS = booleanPreferencesKey("include_dividends")
         val COST_BASIS_METHOD = stringPreferencesKey("cost_basis_method")
         val CURRENT_ACCOUNT_ID = longPreferencesKey("current_account_id")
@@ -63,16 +62,6 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setCurrentAccountId(id: Long) {
         dataStore.edit { preferences ->
             preferences[CURRENT_ACCOUNT_ID] = id
-        }
-    }
-
-    override val isPremiumUnlockedFlow: Flow<Boolean> = dataStore.data.map { preferences ->
-        preferences[IS_PREMIUM_UNLOCKED] ?: false
-    }
-
-    override suspend fun unlockPremium() {
-        dataStore.edit { preferences ->
-            preferences[IS_PREMIUM_UNLOCKED] = true
         }
     }
 

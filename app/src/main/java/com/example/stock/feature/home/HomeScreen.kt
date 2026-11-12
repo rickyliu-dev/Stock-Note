@@ -78,9 +78,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.stock.core.ui.component.item.StockRowItem
-import com.example.stock.core.ui.component.modifier.secretClick
 import com.example.stock.feature.home.component.DashboardHeader
-import com.example.stock.feature.home.component.dialog.UnlockPremiumDialog
 import com.example.stock.core.data.model.Account
 import com.example.stock.core.data.model.HomeSortOrder
 import com.example.stock.core.data.model.TransactionItem
@@ -143,7 +141,6 @@ fun HomeScreen(
 
     val snackBarHostState = remember { SnackbarHostState() }
 
-    var showUnlockDialog by remember { mutableStateOf(false) }
 
     // 初始化 Toast 監聽
     LaunchedEffect(Unit) {
@@ -248,13 +245,7 @@ fun HomeScreen(
                                     Text(
                                         "股記 StockNote",
                                         fontSize = 12.sp,
-                                        color = Color.Gray,
-                                        modifier = Modifier.secretClick(
-                                            times = 7,
-                                            durationMillis = 3000L
-                                        ) {
-                                            showUnlockDialog = true
-                                        }
+                                        color = Color.Gray
                                     )
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(
@@ -687,15 +678,6 @@ fun HomeScreen(
                 }) { Text("刪除") }
             },
             dismissButton = { TextButton(onClick = { stockToDelete = null }) { Text("取消") } }
-        )
-    }
-
-    if (showUnlockDialog) {
-        UnlockPremiumDialog(
-            onDismiss = { showUnlockDialog = false },
-            onVerify = { code ->
-                viewModel.verifyAndUnlock(code)
-            }
         )
     }
 }

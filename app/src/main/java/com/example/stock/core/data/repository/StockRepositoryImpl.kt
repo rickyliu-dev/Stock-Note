@@ -1,5 +1,6 @@
 package com.example.stock.core.data.repository
 
+import com.example.stock.core.data.model.MarketAvailability
 import com.example.stock.core.data.model.StockDetail
 import com.example.stock.core.data.model.SearchRegion
 import com.example.stock.core.data.source.TwStockLocalDataSource
@@ -20,7 +21,8 @@ import javax.inject.Singleton
 class StockRepositoryImpl @Inject constructor(
     private val twLocal: TwStockLocalDataSource,
     private val twRemote: TwStockRemoteDataSource,
-    private val yahoo: YahooRemoteDataSource
+    private val yahoo: YahooRemoteDataSource,
+    private val marketAvailability: MarketAvailability
 ) : StockRepository {
 
     // 記憶體快取 (代號 -> 名稱 / 市場後綴)
@@ -66,23 +68,31 @@ class StockRepositoryImpl @Inject constructor(
 
     override suspend fun searchStocks(
         query: String,
-        region: SearchRegion//
+        region: SearchRegion
     ): List<Pair<String, String>> {
         val q = query.trim().uppercase()
         if (q.isBlank()) return emptyList()
 
-        val results = mutableListOf<Pair<String, String>>()
-
-        if (region == SearchRegion.TW || region == SearchRegion.ALL) {
-            ensureTwStocksLoaded()
-            results += searchLocalTw(q)
-            if (region == SearchRegion.TW) return results
+        // 只使用這個 flavor 允許的地區：ALL 不被允許時退回台股；其他不被允許的地區直接回傳空結果
+        val allowed = marketAvailability.searchRegions
+        val effective = when {
+            region in allowed -> region
+            region == SearchRegion.ALL && SearchRegion.TW in allowed -> SearchRegion.TW
+            else -> return emptyList()
         }
 
-        if (region == SearchRegion.US || (region == SearchRegion.ALL && results.size < 5)) {
+        val results = mutableListOf<Pair<String, String>>()
+
+        if (effective == SearchRegion.TW || effective == SearchRegion.ALL) {
+            ensureTwStocksLoaded()
+            results += searchLocalTw(q)
+            if (effective == SearchRegion.TW) return results
+        }
+
+        if (effective == SearchRegion.US || (effective == SearchRegion.ALL && results.size < 5)) {
             val remote = withContext(Dispatchers.IO) { yahoo.search(q) }
                 .filter { (code, _) ->
-                    if (region == SearchRegion.US) !code.all { it.isDigit() } && !code.contains(".")
+                    if (effective == SearchRegion.US) !code.all { it.isDigit() } && !code.contains(".")
                     else true
                 }
             val existing = results.map { it.first.substringBefore('.') }.toSet()
