@@ -4,6 +4,7 @@ import com.example.stock.core.data.MarketConstants
 import com.example.stock.core.data.model.AutoBackupInterval
 import com.example.stock.core.data.model.CostBasisMethod
 import com.example.stock.core.data.model.DashboardSettingItem
+import com.example.stock.core.data.model.GoogleDriveAccount
 import com.example.stock.core.data.model.HomeSort
 import kotlinx.coroutines.flow.Flow
 
@@ -40,6 +41,10 @@ interface SettingsRepository {
     // 自動備份到 Google Drive 的頻率
     val autoBackupIntervalFlow: Flow<AutoBackupInterval>
     suspend fun setAutoBackupInterval(interval: AutoBackupInterval)
+
+    // 已授權雲端備份的 Google 帳號；null 代表未登入
+    val googleDriveAccountFlow: Flow<GoogleDriveAccount?>
+    suspend fun setGoogleDriveAccount(account: GoogleDriveAccount?)
 
     // 首頁股票清單的排序方式
     val homeSortFlow: Flow<HomeSort>

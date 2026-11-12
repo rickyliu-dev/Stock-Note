@@ -12,6 +12,7 @@ import com.example.stock.core.data.MarketConstants
 import com.example.stock.core.data.model.AutoBackupInterval
 import com.example.stock.core.data.model.CostBasisMethod
 import com.example.stock.core.data.model.DashboardSettingItem
+import com.example.stock.core.data.model.GoogleDriveAccount
 import com.example.stock.core.data.model.HomeSort
 import com.example.stock.core.data.model.HomeSortOrder
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -43,6 +44,8 @@ class SettingsRepositoryImpl @Inject constructor(
         val AUTO_BACKUP_INTERVAL = stringPreferencesKey("auto_backup_interval")
         val HOME_SORT_ORDER = stringPreferencesKey("home_sort_order")
         val HOME_SORT_DESCENDING = booleanPreferencesKey("home_sort_descending")
+        val GOOGLE_DRIVE_EMAIL = stringPreferencesKey("google_drive_email")
+        val GOOGLE_DRIVE_DISPLAY_NAME = stringPreferencesKey("google_drive_display_name")
     }
 
     override val lastUpdateTimestampFlow: Flow<Long> = dataStore.data.map { preferences ->
@@ -157,6 +160,27 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setAutoBackupInterval(interval: AutoBackupInterval) {
         dataStore.edit { preferences ->
             preferences[AUTO_BACKUP_INTERVAL] = interval.name
+        }
+    }
+
+    // 🟢 雲端備份的 Google 帳號
+    override val googleDriveAccountFlow: Flow<GoogleDriveAccount?> = dataStore.data.map { preferences ->
+        preferences[GOOGLE_DRIVE_EMAIL]?.let { email ->
+            GoogleDriveAccount(email, preferences[GOOGLE_DRIVE_DISPLAY_NAME])
+        }
+    }
+
+    override suspend fun setGoogleDriveAccount(account: GoogleDriveAccount?) {
+        dataStore.edit { preferences ->
+            if (account == null) {
+                preferences.remove(GOOGLE_DRIVE_EMAIL)
+                preferences.remove(GOOGLE_DRIVE_DISPLAY_NAME)
+            } else {
+                preferences[GOOGLE_DRIVE_EMAIL] = account.email
+                val name = account.displayName
+                if (name == null) preferences.remove(GOOGLE_DRIVE_DISPLAY_NAME)
+                else preferences[GOOGLE_DRIVE_DISPLAY_NAME] = name
+            }
         }
     }
 

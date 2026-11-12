@@ -1,7 +1,9 @@
 package com.example.stock.feature.setting
 
+import android.app.Activity
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -17,6 +19,7 @@ import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,7 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.stock.core.data.model.AutoBackupInterval
-import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.example.stock.core.util.DriveAuthResult
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -42,58 +45,51 @@ fun CloudBackupScreen(
     val lastUpdateTimestamp by viewModel.lastUpdateTimestampFlow.collectAsState(initial = 0L)
     val autoBackupInterval by viewModel.autoBackupInterval.collectAsState()
     
-    var currentAccount by remember { mutableStateOf(GoogleSignIn.getLastSignedInAccount(context)) }
+    val currentAccount by viewModel.googleDriveAccount.collectAsState()
     var showLogoutConfirm by remember { mutableStateOf(false) }
 
-    // --- Google Drive 登入 Launcher ---
-    val googleLoginLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-        try {
-            val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
-            if (account != null) {
-                currentAccount = account
-                Toast.makeText(context, "登入成功！", Toast.LENGTH_SHORT).show()
-            }
-        } catch (e: Exception) {
-            Toast.makeText(context, "Google 登入失敗: ${e.message}", Toast.LENGTH_SHORT).show()
+    // 等待授權畫面回來後要執行的操作（登入／備份／還原）
+    var pendingAction by rememberSaveable { mutableStateOf<GoogleDriveAction?>(null) }
+
+    // 取得授權後執行操作並顯示結果；還原的訊息較長，顯示久一點
+    val runAction: (GoogleDriveAction, String) -> Unit = { action, accessToken ->
+        viewModel.runDriveAction(action, accessToken) { _, message ->
+            val duration = if (action == GoogleDriveAction.RESTORE) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
+            Toast.makeText(context, message, duration).show()
         }
     }
 
-    // --- Google Drive 備份的 Launcher ---
-    val googleSignInLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
+    // --- Google Drive 授權畫面（選帳號／同意存取）的 Launcher ---
+    val authorizationLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
-        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-        try {
-            val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
-            if (account != null) {
-                currentAccount = account
-                viewModel.backupToDrive(account) { success ->
-                    val msg = if (success) "備份成功！" else "備份失敗"
-                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                }
-            }
-        } catch (e: Exception) {
-            Toast.makeText(context, "Google 登入失敗: ${e.message}", Toast.LENGTH_SHORT).show()
+        val action = pendingAction
+        pendingAction = null
+        if (result.resultCode != Activity.RESULT_OK || action == null) {
+            Toast.makeText(context, "已取消 Google 授權", Toast.LENGTH_SHORT).show()
+            return@rememberLauncherForActivityResult
+        }
+        when (val auth = viewModel.handleAuthorizationResult(result.data)) {
+            is DriveAuthResult.Granted -> runAction(action, auth.accessToken)
+            is DriveAuthResult.NeedsResolution,
+            is DriveAuthResult.Failed -> Toast.makeText(context, "Google 授權失敗", Toast.LENGTH_SHORT).show()
         }
     }
 
-    val googleRestoreLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-        try {
-            val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
-            if (account != null) {
-                currentAccount = account
-                viewModel.restoreFromDrive(account) { _, message ->
-                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+    // 先要求授權：已授權直接執行；需要使用者確認時開授權畫面，回來後再執行
+    val startDriveAction: (GoogleDriveAction) -> Unit = { action ->
+        viewModel.requestDriveAccess { auth ->
+            when (auth) {
+                is DriveAuthResult.Granted -> runAction(action, auth.accessToken)
+                is DriveAuthResult.NeedsResolution -> {
+                    pendingAction = action
+                    authorizationLauncher.launch(
+                        IntentSenderRequest.Builder(auth.pendingIntent.intentSender).build()
+                    )
                 }
+                is DriveAuthResult.Failed ->
+                    Toast.makeText(context, "Google 授權失敗: ${auth.message}", Toast.LENGTH_SHORT).show()
             }
-        } catch (e: Exception) {
-            Toast.makeText(context, "Google 登入失敗: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -147,7 +143,7 @@ fun CloudBackupScreen(
                             .horizontalScroll(rememberScrollState())
                     ) {
                         Text(
-                            text = currentAccount?.displayName ?: "尚未登入",
+                            text = currentAccount?.let { it.displayName ?: it.email } ?: "尚未登入",
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
                             maxLines = 1
@@ -171,7 +167,7 @@ fun CloudBackupScreen(
                     } else {
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
-                            onClick = { googleLoginLauncher.launch(viewModel.getGoogleSignInIntent()) },
+                            onClick = { startDriveAction(GoogleDriveAction.LOGIN) },
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             shape = RoundedCornerShape(8.dp)
                         ) {
@@ -254,7 +250,7 @@ fun CloudBackupScreen(
                 Text("正在處理中，請稍候...", modifier = Modifier.padding(top = 16.dp), color = Color.Gray)
             } else {
                 Button(
-                    onClick = { googleSignInLauncher.launch(viewModel.getGoogleSignInIntent()) },
+                    onClick = { startDriveAction(GoogleDriveAction.BACKUP) },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -266,7 +262,7 @@ fun CloudBackupScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedButton(
-                    onClick = { googleRestoreLauncher.launch(viewModel.getGoogleSignInIntent()) },
+                    onClick = { startDriveAction(GoogleDriveAction.RESTORE) },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.secondary)
@@ -296,7 +292,6 @@ fun CloudBackupScreen(
                         showLogoutConfirm = false
                         viewModel.signOutFromGoogle { success ->
                             if (success) {
-                                currentAccount = null
                                 onBack() // 登出後返回上一頁
                             }
                         }

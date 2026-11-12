@@ -1,15 +1,17 @@
 package com.example.stock.core.util
 
+import android.accounts.Account
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
-import com.google.android.gms.auth.api.signin.GoogleSignInClient
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.example.stock.core.data.model.GoogleDriveAccount
+import com.google.android.gms.auth.api.identity.AuthorizationRequest
+import com.google.android.gms.auth.api.identity.AuthorizationResult
+import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.common.api.Scope
-import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
+import com.google.android.gms.tasks.Task
 import com.google.api.client.http.FileContent
+import com.google.api.client.http.HttpRequestInitializer
 import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
 import com.google.api.services.drive.Drive
@@ -17,7 +19,10 @@ import com.google.api.services.drive.DriveScopes
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import java.io.File
 import java.io.FileOutputStream
 import javax.inject.Inject
@@ -31,41 +36,57 @@ class GoogleDriveManager @Inject constructor(
     companion object {
         private const val TAG = "GoogleDriveManager"
         private const val RESTORE_TEMP_DIR = "restore_tmp"
+        private const val GOOGLE_ACCOUNT_TYPE = "com.google"
     }
 
-    private val googleSignInOptions = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-        .requestEmail()
-        .requestScopes(Scope(DriveScopes.DRIVE_APPDATA))
-        .build()
+    private val authorizationClient = Identity.getAuthorizationClient(context)
 
-    private val googleSignInClient: GoogleSignInClient = GoogleSignIn.getClient(context, googleSignInOptions)
-
-    fun getSignInIntent(): Intent = googleSignInClient.signInIntent
+    private fun authorizationRequest(email: String?): AuthorizationRequest =
+        AuthorizationRequest.Builder()
+            .setRequestedScopes(listOf(Scope(DriveScopes.DRIVE_APPDATA)))
+            .apply { if (email != null) setAccount(Account(email, GOOGLE_ACCOUNT_TYPE)) }
+            .build()
 
     /**
-     * 登出 Google 帳號，清除登入狀態以便使用者更換帳號
+     * 要求 Drive appdata 授權。
+     * email 為 null 時由 Google 決定帳號（必要時會回傳 NeedsResolution 讓使用者選帳號）；
+     * 已授權過的帳號會直接回傳 Granted，不會跳畫面。
      */
-    suspend fun signOut(): Boolean = withContext(Dispatchers.IO) {
-        try {
-            googleSignInClient.signOut()
-            // 同時清除快取中的認證資訊
-            android.util.Log.d(TAG, "Google 帳號已成功登出")
-            true
+    suspend fun requestAuthorization(email: String?): DriveAuthResult = try {
+        authorizationClient.authorize(authorizationRequest(email)).await().toDriveAuthResult()
+    } catch (e: Exception) {
+        android.util.Log.e(TAG, "要求 Drive 授權失敗", e)
+        DriveAuthResult.Failed(e.message ?: e.javaClass.simpleName)
+    }
+
+    /** 解析授權畫面（NeedsResolution 的 PendingIntent）回傳的結果 */
+    fun authorizationResultFromIntent(data: Intent?): DriveAuthResult {
+        if (data == null) return DriveAuthResult.Failed("未取得授權結果")
+        return try {
+            authorizationClient.getAuthorizationResultFromIntent(data).toDriveAuthResult()
         } catch (e: Exception) {
-            android.util.Log.e(TAG, "Google 登出失敗", e)
-            false
+            android.util.Log.e(TAG, "解析 Drive 授權結果失敗", e)
+            DriveAuthResult.Failed(e.message ?: e.javaClass.simpleName)
         }
     }
 
-    fun getDriveService(account: GoogleSignInAccount): Drive {
-        val credential = GoogleAccountCredential.usingOAuth2(
-            context, listOf(DriveScopes.DRIVE_APPDATA)
-        )
-        credential.selectedAccount = account.account
+    /** 用 access token 查詢授權的是哪個 Google 帳號 */
+    suspend fun fetchAccount(accessToken: String): GoogleDriveAccount = withContext(Dispatchers.IO) {
+        val user = getDriveService(accessToken).about().get()
+            .setFields("user(emailAddress,displayName)")
+            .execute()
+            .user
+        GoogleDriveAccount(email = user.emailAddress, displayName = user.displayName)
+    }
+
+    fun getDriveService(accessToken: String): Drive {
+        val requestInitializer = HttpRequestInitializer { request ->
+            request.headers.authorization = "Bearer $accessToken"
+        }
         return Drive.Builder(
             NetHttpTransport(),
             GsonFactory.getDefaultInstance(),
-            credential
+            requestInitializer
         ).setApplicationName("Stock App").build()
     }
 
@@ -74,9 +95,9 @@ class GoogleDriveManager @Inject constructor(
      * 每個資料庫採搜尋並覆蓋 (Search-and-Update) 模式，
      * 確保 appDataFolder 中每個 driveFileName 永遠只有一個檔案 ID。
      */
-    suspend fun backupDatabase(account: GoogleSignInAccount): Boolean = withContext(Dispatchers.IO) {
+    suspend fun backupDatabase(accessToken: String): Boolean = withContext(Dispatchers.IO) {
         val driveService = try {
-            getDriveService(account)
+            getDriveService(accessToken)
         } catch (e: Exception) {
             android.util.Log.e(TAG, "建立 Drive 服務失敗", e)
             return@withContext false
@@ -175,13 +196,13 @@ class GoogleDriveManager @Inject constructor(
      * 只找自己變體的 driveFileName；找不到不會退回去讀其他檔名。
      * 成功時會重啟 App 進程。
      */
-    suspend fun restoreDatabase(account: GoogleSignInAccount): RestoreResult = withContext(Dispatchers.IO) {
+    suspend fun restoreDatabase(accessToken: String): RestoreResult = withContext(Dispatchers.IO) {
         val tempDir = File(context.cacheDir, RESTORE_TEMP_DIR)
         try {
             tempDir.deleteRecursively()
             tempDir.mkdirs()
 
-            val driveService = getDriveService(account)
+            val driveService = getDriveService(accessToken)
 
             // 1. 全部下載到暫存資料夾（雲端沒有的檔案 downloaded = null）
             val items = backupTargets.map { target ->
@@ -246,4 +267,20 @@ class GoogleDriveManager @Inject constructor(
         if (dest.length() == 0L) throw Exception("下載檔案為空 ($fileName)")
         return dest
     }
+}
+
+private fun AuthorizationResult.toDriveAuthResult(): DriveAuthResult {
+    val pending = pendingIntent
+    val token = accessToken
+    return when {
+        hasResolution() && pending != null -> DriveAuthResult.NeedsResolution(pending)
+        token != null -> DriveAuthResult.Granted(token)
+        else -> DriveAuthResult.Failed("未取得 access token")
+    }
+}
+
+private suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { cont ->
+    addOnSuccessListener { cont.resume(it) }
+    addOnFailureListener { cont.resumeWithException(it) }
+    addOnCanceledListener { cont.cancel() }
 }

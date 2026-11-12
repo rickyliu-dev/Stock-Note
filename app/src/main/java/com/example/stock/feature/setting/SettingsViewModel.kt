@@ -1,5 +1,6 @@
 package com.example.stock.feature.setting
 
+import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -16,11 +17,11 @@ import com.example.stock.core.data.repository.SettingsRepository
 import com.example.stock.core.data.repository.TransactionRepository
 import com.example.stock.core.util.AutoBackupScheduler
 import com.example.stock.core.util.CsvManager
+import com.example.stock.core.util.DriveAuthResult
 import com.example.stock.core.util.GoogleDriveManager
 import com.example.stock.core.util.LocalBackupManager
 import com.example.stock.core.util.RestoreResult
 import com.example.stock.navigation.SettingsEntry
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -176,42 +177,77 @@ class SettingsViewModel @Inject constructor(
     private val _isBackupLoading = MutableStateFlow(false)
     val isBackupLoading = _isBackupLoading.asStateFlow()
 
-    fun getGoogleSignInIntent() = googleDriveManager.getSignInIntent()
+    /** 已授權雲端備份的 Google 帳號；null 代表未登入 */
+    val googleDriveAccount = repository.googleDriveAccountFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = null
+    )
 
+    /** 向 Google 要求 Drive 授權；已登入時指定該帳號，避免每次都跳帳號選擇 */
+    fun requestDriveAccess(onResult: (DriveAuthResult) -> Unit) {
+        viewModelScope.launch {
+            val email = repository.googleDriveAccountFlow.first()?.email
+            onResult(googleDriveManager.requestAuthorization(email))
+        }
+    }
+
+    /** 解析授權畫面回傳的 Intent */
+    fun handleAuthorizationResult(data: Intent?): DriveAuthResult =
+        googleDriveManager.authorizationResultFromIntent(data)
+
+    /**
+     * 取得授權後：記下帳號，再執行對應操作。
+     * onResult(是否成功, 可顯示給使用者的訊息)
+     */
+    fun runDriveAction(action: GoogleDriveAction, accessToken: String, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            _isBackupLoading.value = true
+            val account = try {
+                googleDriveManager.fetchAccount(accessToken)
+            } catch (e: Exception) {
+                android.util.Log.e("SettingsViewModel", "取得 Google 帳號資訊失敗", e)
+                null
+            }
+            if (account == null) {
+                _isBackupLoading.value = false
+                onResult(false, "無法取得 Google 帳號資訊，請稍後再試")
+                return@launch
+            }
+            repository.setGoogleDriveAccount(account)
+
+            when (action) {
+                GoogleDriveAction.LOGIN -> {
+                    _isBackupLoading.value = false
+                    onResult(true, "登入成功！")
+                }
+                GoogleDriveAction.BACKUP -> {
+                    val success = googleDriveManager.backupDatabase(accessToken)
+                    if (success) {
+                        repository.setLastUpdateTimestamp(System.currentTimeMillis())
+                    }
+                    _isBackupLoading.value = false
+                    onResult(success, if (success) "備份成功！" else "備份失敗")
+                }
+                GoogleDriveAction.RESTORE -> {
+                    val result = googleDriveManager.restoreDatabase(accessToken)
+                    val success = result is RestoreResult.Success
+                    _isBackupLoading.value = false
+                    if (success) {
+                        android.util.Log.d("SettingsViewModel", "資料庫還原成功，UI 應已自動更新")
+                    }
+                    onResult(success, result.userMessage)
+                }
+            }
+        }
+    }
+
+    /** 登出：清除記錄的帳號，之後自動備份會略過，直到再次登入 */
     fun signOutFromGoogle(onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
-            _isBackupLoading.value = true
-            val success = googleDriveManager.signOut()
-            _isBackupLoading.value = false
-            onResult(success)
-        }
-    }
-
-    fun backupToDrive(account: GoogleSignInAccount, onResult: (Boolean) -> Unit) {
-        viewModelScope.launch {
-            _isBackupLoading.value = true
-            val success = googleDriveManager.backupDatabase(account)
-            if (success) {
-                repository.setLastUpdateTimestamp(System.currentTimeMillis())
-            }
-            _isBackupLoading.value = false
-            onResult(success)
-        }
-    }
-
-    /** onResult(是否成功, 可顯示給使用者的訊息) */
-    fun restoreFromDrive(account: GoogleSignInAccount, onResult: (Boolean, String) -> Unit) {
-        viewModelScope.launch {
-            _isBackupLoading.value = true
-            val result = googleDriveManager.restoreDatabase(account)
-            val success = result is com.example.stock.core.util.RestoreResult.Success
-            _isBackupLoading.value = false
-
-            if (success) {
-                android.util.Log.d("SettingsViewModel", "資料庫還原成功，UI 應已自動更新")
-            }
-
-            onResult(success, result.userMessage)
+            repository.setGoogleDriveAccount(null)
+            android.util.Log.d("SettingsViewModel", "Google 帳號已登出")
+            onResult(true)
         }
     }
 
