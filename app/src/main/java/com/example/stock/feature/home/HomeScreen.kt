@@ -47,14 +47,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -459,13 +458,13 @@ fun HomeScreen(
                             )
                         }
                     }
-                    TabRow(
+                    SecondaryTabRow(
                         selectedTabIndex = selectedTabIndex,
                         containerColor = Color.White,
                         contentColor = Color(0xFFEF4444),
-                        indicator = { tabPositions ->
+                        indicator = {
                             TabRowDefaults.SecondaryIndicator(
-                                Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
+                                Modifier.tabIndicatorOffset(selectedTabIndex),
                                 color = Color(0xFFEF4444) // 紅色底線
                             )
                         }
